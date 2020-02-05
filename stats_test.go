@@ -2,11 +2,8 @@ package kompress
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"math"
-	"os"
-	"testing"
 )
 
 // Stats provides stats for a byte reader.
@@ -16,10 +13,18 @@ func Stats(r io.Reader) (int, float64, float64) {
 
 	var sum, sum2 float64
 	var n int
-	var b byte
 	var err error
+	var b byte
 
-	for b, err = rr.ReadByte(); err != nil; {
+	for {
+
+		b, err = rr.ReadByte()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
 
 		n++
 		f := float64(b)
@@ -32,16 +37,5 @@ func Stats(r io.Reader) (int, float64, float64) {
 	sigma := math.Sqrt(vr)
 
 	return n, mean, sigma
-
-}
-
-func TestStats(t *testing.T) {
-	in, err := os.Open("LICENSE")
-	if err != nil {
-		panic(err)
-	}
-	defer in.Close()
-	n, m, s := Stats(in)
-	fmt.Println("Stats tests : ", n, m, s)
 
 }

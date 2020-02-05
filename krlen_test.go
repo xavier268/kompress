@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -38,7 +39,7 @@ func TestKCompress(t *testing.T) {
 		if err != io.EOF && err != nil {
 			panic(err)
 		}
-		fmt.Println("Test sample : ", i/2)
+		//fmt.Println("Test sample : ", i/2)
 		if bytes.Compare(expect, out.Bytes()) != 0 {
 			fmt.Printf("From    \t%v\n", source)
 			fmt.Printf("Got     \t%v\n", out.Bytes())
@@ -64,7 +65,7 @@ func TestKDecompress(t *testing.T) {
 		if err != io.EOF && err != nil {
 			panic(err)
 		}
-		fmt.Println("Test sample : ", i/2)
+		//fmt.Println("Test sample : ", i/2)
 		if bytes.Compare(expect, out.Bytes()) != 0 {
 			fmt.Printf("From    \t%v\n", source)
 			fmt.Printf("Got     \t%v\n", out.Bytes())
@@ -102,7 +103,7 @@ func TestCompressDecompress(t *testing.T) {
 			panic(err)
 		}
 
-		fmt.Println("Test sample : ", i)
+		//fmt.Println("Test sample : ", i)
 		if bytes.Compare(source, out2.Bytes()) != 0 {
 			fmt.Printf("From    \t%v\n", source)
 			fmt.Printf("Got     \t%v\n", out1.Bytes())
@@ -150,7 +151,7 @@ func TestDecompressCompress(t *testing.T) {
 				panic(err)
 			}
 
-			fmt.Println("Test sample : ", i)
+			//fmt.Println("Test sample : ", i)
 			if bytes.Compare(source, out2.Bytes()) != 0 {
 				fmt.Printf("From    \t%v\n", source)
 				fmt.Printf("Got     \t%v\n", out1.Bytes())
@@ -214,4 +215,28 @@ func getKrlenTestData() [][]byte {
 	data = append(data, []byte{0, 255, 22, 0, 3, 22})
 
 	return data
+}
+
+func TestKStats(t *testing.T) {
+	in, err := os.Open("LICENSE")
+	if err != nil {
+		panic(err)
+	}
+
+	n, m, s := Stats(in)
+	fmt.Println("Stats before compress : ", n, m, s)
+	in.Close()
+
+	in, err = os.Open("LICENSE")
+	if err != nil {
+		panic(err)
+	}
+	defer in.Close()
+
+	out := bytes.NewBuffer(nil)
+	k := NewKrlen()
+	k.Compress(in, out)
+
+	n, m, s = Stats(bytes.NewReader(out.Bytes()))
+	fmt.Println("Stats after compress : ", n, m, s)
 }
