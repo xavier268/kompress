@@ -12,20 +12,20 @@ import (
 // Compiler checks
 var _ Compresser = new(Krlen)
 
-func TestKBasic(t *testing.T) {
+func TestKrlenBasic(t *testing.T) {
 	k := NewKrlen()
 	s := "ababbaaa\x00bbbc"
 	in := strings.NewReader(s)
 	fmt.Printf("From\t%v \nTo  \t", []byte(s))
 
-	err := k.Compress(in, new(Writer))
+	err := k.Compress(in, new(Dumper))
 	if err != nil && err != io.EOF {
 		panic(err)
 	}
 	fmt.Println()
 }
 
-func TestKCompress(t *testing.T) {
+func TestKrlenCompress(t *testing.T) {
 	k := NewKrlen()
 	data := getTestData()
 
@@ -51,7 +51,7 @@ func TestKCompress(t *testing.T) {
 
 }
 
-func TestKDecompress(t *testing.T) {
+func TestKrlenDecompress(t *testing.T) {
 	k := NewKrlen()
 	data := getTestData()
 
@@ -76,7 +76,7 @@ func TestKDecompress(t *testing.T) {
 	}
 }
 
-func TestCompressDecompress(t *testing.T) {
+func TestKrlenCompressDecompress(t *testing.T) {
 
 	k := NewKrlen()
 	kk := NewKrlen()
@@ -115,7 +115,7 @@ func TestCompressDecompress(t *testing.T) {
 
 }
 
-func TestDecompressCompress(t *testing.T) {
+func TestKrlenDecompressCompress(t *testing.T) {
 	// This test would fail, and this is NORMAL.
 	// Some formats are not fully anticipated as invalid compressed format,
 	// such as : 0000 uncompr>>> 00 compress>>> 010
@@ -163,7 +163,7 @@ func TestDecompressCompress(t *testing.T) {
 
 }
 
-func TestKStats(t *testing.T) {
+func TestKrlenStats(t *testing.T) {
 	in, err := os.Open("LICENSE")
 	if err != nil {
 		panic(err)

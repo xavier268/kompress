@@ -10,30 +10,42 @@ import (
 // Compiler check
 var _ Compresser = new(Kdyndelta)
 
-func TestKDinDeltaBasic(t *testing.T) {
+func TestKdindeltaBasic(t *testing.T) {
 
-	k := NewKdyndelta(4)
-	in := strings.NewReader("abcabbccabcaabbcc")
-	k.Compress(in, new(Writer))
+	k := NewKdyndelta(1)
+	source := "abcabbcabcaabbcababbbababababbababababdc"
+	in := strings.NewReader(source)
+	out := bytes.NewBuffer(nil)
 
-	if len(k.buf) != 4 {
-		t.Fail()
+	k.Compress(in, out)
+	fmt.Println("From\t", []byte(source), "\nTo \t", out.Bytes())
+
+	if len(k.buf) != 3 || len(source) != len(out.Bytes()) {
+		t.Fatal("inconsistent Kdyndelta compression")
 	}
 
 }
 
-func TestKdynCompressDecompress(t *testing.T) {
+func TestKdyndeltaCompressDecompress(t *testing.T) {
 	k := NewKdyndelta(4)
 	kk := NewKdyndelta(4)
 	data := getTestData()
 
-	for i := 0; i < len(data) && i < 60; i++ {
+	for i := 0; i < len(data); i++ {
 		k.Reset()
 		kk.Reset()
 
-		out := bytes.NewBuffer(nil)
-		k.Compress(bytes.NewReader(data[i]), out)
-		fmt.Println(data[i], " ==> ", out.Bytes())
+		out1 := bytes.NewBuffer(nil)
+		k.Compress(bytes.NewReader(data[i]), out1)
 
+		out2 := bytes.NewBuffer(nil)
+		kk.Decompress(bytes.NewReader(out1.Bytes()), out2)
+
+		if len(out2.Bytes()) != len(out1.Bytes()) || bytes.Compare(data[i], out2.Bytes()) != 0 {
+			fmt.Print(data[i], " ==> ", out1.Bytes())
+			fmt.Println(" ==> ", out2.Bytes())
+
+			t.Fatal("invalid Kdyndelta compress/decompress operation")
+		}
 	}
 }

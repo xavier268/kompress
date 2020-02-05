@@ -47,23 +47,53 @@ func (k *Kdyndelta) Compress(in io.Reader, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+
+		// get expected byte, given context
+		h := k.hash()
+		bout.WriteByte(b ^ k.exp[h])
+		// correct expectation for next query of same context
+		k.exp[h] = b
+		// update context
 		k.buf = append(k.buf, b)
 		l := len(k.buf)
 		if l > k.capa {
 			k.buf = k.buf[l-k.capa:]
 		}
-
-		h := k.hash()
-		bout.WriteByte(b ^ k.exp[h])
-		k.exp[h] = b
 	}
 	return nil
 }
 
 // Decompress does the reverse transformation, from the delta encoding.
-// Here, decompress is compress, the operation is its own inverse.
 func (k *Kdyndelta) Decompress(in io.Reader, out io.Writer) error {
-	return k.Compress(in, out)
+
+	bin := bufio.NewReader(in)
+	bout := bufio.NewWriter(out)
+	defer bout.Flush()
+
+	for {
+		b, err := bin.ReadByte()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		// get expected byte, given context
+		h := k.hash()
+		// compute true value = expected xored with delta
+		tv := b ^ k.exp[h]
+		// write true value, set context expectation to true value
+		bout.WriteByte(tv)
+		k.exp[h] = tv
+		// update context with true value
+		k.buf = append(k.buf, tv)
+		l := len(k.buf)
+		if l > k.capa {
+			k.buf = k.buf[l-k.capa:]
+		}
+	}
+	return nil
 }
 
 // Reset returns to the initial state.

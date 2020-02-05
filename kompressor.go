@@ -2,6 +2,7 @@ package kompress
 
 import (
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -14,3 +15,17 @@ type Compresser interface {
 
 // ErrorInvalidCompressionFormat is a compression grammar error
 var ErrorInvalidCompressionFormat = errors.New("invalid compression format")
+
+// Dumper is an io.Writer that dumps its input to the screen.
+type Dumper struct{}
+
+func (w *Dumper) Write(b []byte) (n int, err error) {
+
+	if len(b) == 0 {
+		return 0, io.EOF
+	}
+
+	fmt.Printf("%v\n", b)
+	return len(b), nil
+
+}
