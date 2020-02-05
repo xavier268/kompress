@@ -33,3 +33,8 @@ func (k *Kcombine) Compress(in io.Reader, out io.Writer) error {
 	io.Copy(out, bin)
 	return nil
 }
+
+// Decompress using Compressers in reverse order.
+func (k *Kcombine) Decompress(in io.Reader, out io.Writer) error {
+	panic("Not implemented")
+}
