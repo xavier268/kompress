@@ -12,7 +12,7 @@ var _ Compresser = new(Kdyndelta)
 
 func TestKdindeltaBasic(t *testing.T) {
 
-	k := NewKdyndelta(1)
+	k := NewKdyndelta(3)
 	source := "abcabbcabcaabbcababbbababababbababababdc"
 	in := strings.NewReader(source)
 	out := bytes.NewBuffer(nil)
