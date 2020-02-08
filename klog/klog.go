@@ -19,7 +19,7 @@ func NewKlogReader(r io.Reader) io.Reader {
 
 // NewKlogWriter constructs a new Klog Writer
 // nil sends to stdout.
-func NewKlogWriter(w io.Writer) io.Writer {
+func NewKlogWriter(w io.Writer) io.WriteCloser {
 	rr := new(klogWriter)
 	rr.writer = w
 	if w == nil {
@@ -29,19 +29,17 @@ func NewKlogWriter(w io.Writer) io.Writer {
 }
 
 // A klogReader implements the io.Reader interface.
-// Redaing means decompressing.
+// Reading means decompressing.
 type klogReader struct {
-	count  int
-	reader io.Reader
-	err    error
+	kreader
+	count int
 }
 
 // A klogWriter that implements io.Writer.
 // Writing means compressing.
 type klogWriter struct {
-	count  int
-	writer io.Writer
-	err    error
+	kwriter
+	count int
 }
 
 // Read will fetch up to len(b) bytes,

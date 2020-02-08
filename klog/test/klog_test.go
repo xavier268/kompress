@@ -1,5 +1,5 @@
 // Package ext runs test from outside the packages
-package ext
+package test
 
 import (
 	"bytes"
