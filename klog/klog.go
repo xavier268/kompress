@@ -88,6 +88,7 @@ func (r *klogWriter) Write(buf []byte) (n int, err error) {
 		fmt.Printf("%2X ", buf[i])
 		r.count++
 	}
+
 	if err == io.EOF {
 		fmt.Println("<EOF>")
 	}
