@@ -4,18 +4,63 @@ import (
 	"io"
 )
 
+// The kdelta struct provides a way to learn and predict which bytes
+// is the most likely to appear after a given context.
+// The context itself is materialized by a hash value, computed on a
+// buffer that contains the last bytes seen.
 type kdelta struct {
-	buf     []byte       // last bytes seen
-	capa    int          // max capacity of the buffer
-	exp     map[int]byte // expected bytes for a givent context hash
-	hashmax int          // max size of the hash map
+	buf     []byte     // last bytes seen
+	capa    int        // max capacity of the buffer
+	occ     map[hb]int // counting occurences for {hash x byte}
+	hashmax int        // max size of the hash value
+}
+
+type hb struct {
+	h int
+	b byte
 }
 
 func (k *kdelta) reset(capa int) {
 	k.capa = capa
 	k.hashmax = 1000 * k.capa
-	k.exp = make(map[int]byte, 1000)
+	k.occ = make(map[hb]int, 1000)
 	k.buf = make([]byte, 0, k.capa)
+}
+
+// hash produce a hash from the current byte context
+func (k *kdelta) hash() int {
+	var r int
+	for _, b := range k.buf {
+		r = (r*7 + 11*int(b) + 3) % k.hashmax
+	}
+	return r
+}
+
+// expect gets the expected byte for the given context hash.
+func (k *kdelta) expect(h int) byte {
+	var b byte
+	max := 0
+	for i := 0; i <= 255; i++ {
+		if k.occ[hb{h, byte(i)}] > max {
+			b = byte(i)
+			max = k.occ[hb{h, byte(i)}]
+		}
+	}
+	return b
+}
+
+// learnAndUpdate provides context learning info
+// it also updates the context buffer.
+// h does not have to be the current hash of the current context.
+func (k *kdelta) learnAndUpdate(h int, b byte) {
+	// learn new value
+	k.occ[hb{h, b}]++
+
+	// update context buffer
+	k.buf = append(k.buf, b)
+	if len(k.buf) > k.capa {
+		k.buf = k.buf[1:]
+	}
 }
 
 type kdeltaWriter struct {
@@ -29,6 +74,8 @@ type kdeltaReader struct {
 }
 
 // NewKdeltaWriter constructs an io.WriteCloser that will output delta encoded bytes.
+// Encoding is done by enconding the delat versus the most frequently observed byte
+// for a given byte context window (of width capa)
 func NewKdeltaWriter(w io.Writer, capa int) io.WriteCloser {
 
 	k := new(kdeltaWriter)
@@ -46,30 +93,6 @@ func NewKdeltaReader(r io.Reader, capa int) io.Reader {
 	k.kdelta.reset(capa)
 
 	return k
-}
-
-// hash produce a hash from the current byte context
-func (k *kdelta) hash() int {
-	var r int
-	for _, b := range k.buf {
-		r = (r*7 + 11*int(b) + 3) % k.hashmax
-	}
-	return r
-}
-
-// expect gets the expected byte for the given context hash.
-func (k *kdelta) expect(h int) byte {
-	return k.exp[h]
-}
-
-// learn provides context learning info
-// it also updates the context buffer.
-func (k *kdelta) learn(h int, b byte) {
-	k.exp[h] = b
-	k.buf = append(k.buf, b)
-	if len(k.buf) > k.capa {
-		k.buf = k.buf[1:]
-	}
 }
 
 // Write will produce the delta encoded bytes.
@@ -96,7 +119,7 @@ func (k *kdeltaWriter) Write(bb []byte) (int, error) {
 		count++
 
 		// update expected byte and context
-		k.learn(h, b)
+		k.learnAndUpdate(h, b)
 	}
 
 	return count, k.err
@@ -132,7 +155,7 @@ func (k *kdeltaReader) Read(bb []byte) (int, error) {
 		bb[i] = b
 
 		// update expected byte and context
-		k.learn(h, b)
+		k.learnAndUpdate(h, b)
 	}
 	return count, err
 }
