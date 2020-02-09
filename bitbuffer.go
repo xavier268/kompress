@@ -1,7 +1,8 @@
 package kompress
 
-// Bit are 0 or 1
-type Bit byte
+import (
+	"errors"
+)
 
 // BitBuffer is a buffer to store bits, not bytes.
 type BitBuffer struct {
@@ -27,13 +28,10 @@ func (bb *BitBuffer) Dump() {
 
 }
 
-// WriteBit writes the following bits in the buffer,
-// Panic for value not 0 or 1
-func (bb *BitBuffer) WriteBit(b Bit) {
+// WriteBit writes a bit if b is not nul.
+// Write 0 if b == 0.
+func (bb *BitBuffer) WriteBit(b byte) {
 
-	if b > 1 {
-		panic("invalid bit value")
-	}
 	bb.size++
 	// increase storage capacity if needed
 	if bb.offset+bb.size >= 8*len(bb.bytes) {
@@ -42,7 +40,7 @@ func (bb *BitBuffer) WriteBit(b Bit) {
 	n := ((bb.offset + bb.size + 16) % 8)
 	k := (bb.offset + bb.size) / 8
 	//fmt.Println(k, n)
-	if b == 1 {
+	if b != 0 {
 		bb.bytes[k] |= byte(1 << n)
 	} else {
 		bb.bytes[k] &= (byte(1<<n) ^ byte(255))
@@ -50,7 +48,7 @@ func (bb *BitBuffer) WriteBit(b Bit) {
 }
 
 // ReadBit from buffer, in fifo order.
-func (bb *BitBuffer) ReadBit() Bit {
+func (bb *BitBuffer) ReadBit() byte {
 
 	bb.size--
 	bb.offset++
@@ -70,5 +68,30 @@ func (bb *BitBuffer) ReadBit() Bit {
 		return 0
 	}
 	return 1
+}
 
+// ReadByte reads a single byte from buffer.
+// Error if cannot read at least 8 bits.
+func (bb *BitBuffer) ReadByte() (byte, error) {
+	var b byte
+	if bb.Size() < 8 {
+		return 0, errors.New("bit buffer underflow")
+	}
+	for i := 128; i > 0; i >>= 1 {
+		// DEBUG
+		// fmt.Printf("%08b\n", i)
+
+		if bb.ReadBit() == 1 {
+			b |= byte(i)
+		}
+	}
+	return b, nil
+}
+
+// WriteByte write the corresponding bits in the buffer.
+func (bb *BitBuffer) WriteByte(b byte) error {
+	for i := 128; i > 0; i >>= 1 {
+		bb.WriteBit(b & byte(i))
+	}
+	return nil
 }

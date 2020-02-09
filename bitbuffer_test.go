@@ -12,7 +12,7 @@ func TestBitBufferBasic(t *testing.T) {
 	tb := []byte{0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1}
 
 	for _, b := range tb {
-		bb.WriteBit(Bit(b))
+		bb.WriteBit(b)
 	}
 
 	var res []byte
@@ -26,4 +26,24 @@ func TestBitBufferBasic(t *testing.T) {
 		t.Fail()
 
 	}
+}
+
+func TestReadByteBitBuffer(t *testing.T) {
+
+	bb := NewBitBuffer()
+	tb := []byte{0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1}
+
+	for _, b := range tb {
+		bb.WriteBit(b)
+	}
+
+	b, err := bb.ReadByte()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b != byte(0b01100101) {
+		fmt.Printf("%08b\n", b)
+		t.Fatal("wrong first byte")
+	}
+
 }
