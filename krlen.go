@@ -1,12 +1,13 @@
 package kompress
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 )
 
-// Krlen is a compressor for encoding repeated bytes.
+// KrlenWriter is a compressor for encoding repeated bytes.
 // It encodes the following way :
 // x or xx  where x != 0, is unchanged
 // 0 (single zero) is encoded as <0><0>
@@ -15,211 +16,194 @@ import (
 // 000... is encoded as <0><l><0>, where 2 <= l <= 255
 // where l is the length of the sequence minus 1 ( l==2, means a sequence of 3, as in xxx)
 // so, the max sequence that can be encoded is 255 + 1 = 256
-type Krlen struct {
-	//  last byte seen
-	last byte
-	// length of similar bytes already seen.
-	len int
+type krlenWriter struct {
+	kwriter
+	last byte // Last byte seen
+	len  int  // Sequence length so far ...
 }
 
-// NewKrlen constructs a new Kompressor/Decompressor.
-func NewKrlen() *Krlen {
-	k := new(Krlen)
-	k.Reset()
+type krlenReader struct {
+	kreader
+	// buffer available for the next read
+	// since we may have too many bytes to send at once.
+	buf []byte
+}
+
+// NewKrlenWriter will create a writer that compress run-length sequences.
+// Ensure you close it at the end, to flush pending bytes.
+func NewKrlenWriter(w io.Writer) io.WriteCloser {
+	k := new(krlenWriter)
+	if w == nil {
+		k.writer = os.Stdout
+	} else {
+		k.writer = w
+	}
 	return k
 }
 
-// Reset compressor/decompressor status.
-func (k *Krlen) Reset() {
-	k.last = 0
-	k.len = 0
+// NewKrlenReader will create a reader that decompress run-length sequences.
+func NewKrlenReader(r io.Reader) io.Reader {
+	k := new(krlenReader)
+	if r == nil {
+		k.reader = os.Stdin
+	} else {
+		k.reader = r
+	}
+	return k
 }
 
-// Compress from into to.
-// The error returned is the io.Reader error, including closing the file.
-func (k *Krlen) Compress(from io.Reader, to io.Writer) (err error) {
+// Read (ie decompress) from the provided reader
+func (k *krlenReader) Read(res []byte) (int, error) {
 
-	// Buffer input/output for performance
-	in := bufio.NewReader(from)
-	out := bufio.NewWriter(to)
-	defer out.Flush()
+	if k.err != nil {
+		return 0, k.err
+	}
+	// This is how many bytes we want ...
+	nres := len(res)
 
-	for {
-
-		// Read byte after byte
-		b, err := in.ReadByte()
-
-		if err != nil {
-			// purge last byte(s) read
-			switch k.len {
-			case 0:
-			case 1:
-				if k.last != 0 {
-					out.WriteByte(k.last)
-				} else {
-					out.Write([]byte{0, 0})
-				}
-			case 2:
-				if k.last != 0 {
-					out.WriteByte(k.last)
-					out.WriteByte(k.last)
-				} else {
-					out.Write([]byte{0, 1, 0})
-				}
+	var e error
+	var b byte
+	// Loop until we have enough in buffer
+	for len(k.buf) <= nres {
+		b, e = k.readByte()
+		if e != nil {
+			break
+		}
+		switch b {
+		case 0:
+			bb, e := k.readByte()
+			switch {
+			case e != nil:
+				k.err = errors.New(e.Error() + " : invalid compression format")
+			case bb == 0:
+				k.buf = append(k.buf, 0) // single zero
 			default:
-				if k.len >= 256 {
-					panic("logic error - too long sequence at the end")
+				x, e := k.readByte()
+				if e != nil {
+					k.err = errors.New(e.Error() + " : invalid compression format")
+				} else {
+					for i := 0; i < int(bb)+1; i++ {
+						k.buf = append(k.buf, x)
+					}
 				}
-				out.Write([]byte{0, byte(k.len - 1), k.last})
-			}
-			return err
-		}
-
-		// Starting reading ...
-		if k.len == 0 {
-			k.last = b
-			k.len = 1
-			continue
-		}
-
-		// One byte already read
-		if k.len == 1 {
-			if k.last == 0 && k.last != b {
-				// emit 0 0
-				_, err = out.Write([]byte{0, 0})
-				if err != nil {
-					return err
-				}
-				k.last = b
-				k.len = 1
-				continue
-			}
-			if k.last != 0 && k.last != b {
-				// emit x
-				err = out.WriteByte(k.last)
-				if err != nil {
-					return err
-				}
-				k.last = b
-				k.len = 1
-				continue
-			}
-			if k.last == b {
-				// continue the sequence ...
-				k.len = k.len + 1
-				continue
-			}
-		}
-		if k.len == 2 && k.last != 0 && k.last != b {
-			// special case "xx" should not be encoded
-			_, err = out.Write([]byte{k.last, k.last})
-			if err != nil {
-				return err
-			}
-			k.len = 1
-			k.last = b
-			continue
-		}
-		if k.len >= 2 && k.len <= 254 {
-			if k.last == b {
-				k.len = k.len + 1
-				continue
-			} else { // k.last != b
-				_, err = out.Write([]byte{0, byte(k.len - 1), k.last})
-				if err != nil {
-					return err
-				}
-				k.last = b
-				k.len = 1
-				continue
 			}
 
+		default:
+			k.buf = append(k.buf, b)
+
 		}
-		if k.len == 255 {
-			// emit in any case
-			if k.last != b {
-				_, err = out.Write([]byte{0, byte(k.len - 1), k.last})
-				if err != nil {
-					return err
-				}
-				k.len = 1
-				k.last = b
-				continue
-			} else { // k.last == b
-				_, err = out.Write([]byte{0, byte(k.len), k.last})
-				if err != nil {
-					return err
-				}
-				k.len = 0
-				continue
-			}
-		}
-		panic("State error")
 
 	}
+
+	if e == nil {
+		// we should have enough ...
+		if len(k.buf) < nres {
+			panic("internal error - we should have a full buffer")
+		}
+		copy(res, k.buf[0:nres])
+		k.buf = k.buf[nres:]
+		return nres, nil
+	}
+
+	// e != nil, but DO NOT ASSUME buffer is smaller than res !!
+	n := len(k.buf)
+	if n < nres {
+		copy(res, k.buf)
+		k.err = e
+		return n, e
+	}
+	// Now, buffer is larger than res - do not send the error (EOF) yet !
+	copy(res, k.buf[:nres])
+	k.buf = k.buf[:nres]
+	// Don't send error yet, until buffer is empty !
+	return nres, nil
+
 }
 
-// Decompress from into to.
-func (k *Krlen) Decompress(from io.Reader, to io.Writer) (err error) {
+// Write( ie Compress )  into to the provided writer.
+func (k *krlenWriter) Write(buf []byte) (int, error) {
 
-	// Buffer input/output for performance
-	in := bufio.NewReader(from)
-	out := bufio.NewWriter(to)
-	defer out.Flush()
+	if k.err != nil {
+		return 0, k.err
+	}
 
-	for {
+	// read byte after byte ...
+	for _, b := range buf {
 
-		// Read byte after byte
-		b, err := in.ReadByte()
-
-		if err == io.EOF && k.len == 0 {
-			return err
-		}
-
-		if err != nil {
-			fmt.Println(err)
-			return ErrorInvalidCompressionFormat
-		}
-
-		// emit double zero
-		if k.len == 1 && k.last == 0 && b == 0 {
-			err = out.WriteByte(0)
-			if err != nil {
-				return err
-			}
-			k.len = 0
-			continue
-		}
-
-		// emit compressed data - first step
-		if k.len == 1 && k.last == 0 && b != 0 {
-			// read more !
-			k.len = 2
+		switch {
+		case k.len == 0:
+			// just start a new sequence ...
 			k.last = b
-			continue
-		}
-
-		// emit compressed data - second step
-		if k.len == 2 {
-			for i := 0; i <= int(k.last); i++ {
-				out.WriteByte(b)
-			}
-			k.len = 0
-			k.last = 0
-			continue
-		}
-
-		// Handle start 0
-		if k.len == 0 && k.last == 0 && b == 0 {
 			k.len = 1
-			k.last = 0
-			continue
+		case k.len == 1:
+			switch {
+			case k.last == 0 && b != k.last: // single zero
+				k.emit(0, 0)
+				k.last = b
+				k.len = 1
+			case k.last != 0 && b != k.last: // single non-zero
+				k.emit(k.last)
+				k.last = b
+				k.len = 1
+			case b == k.last:
+				k.len++
+			default:
+				panic("internal error")
+			}
+		case k.len == 2:
+			switch {
+			case k.last != 0 && b != k.last: // double non zero
+				k.emit(k.last, k.last)
+				k.last = b
+				k.len = 1
+			case k.last == 0 && b != k.last: // double zero confirmed
+				k.emit(0, 1, 0)
+				k.last = b
+				k.len = 1
+			case b == k.last:
+				k.len++
+			default:
+				panic("internal error")
+			}
+		case k.len > 2 && k.len < 256:
+			switch {
+			case b != k.last:
+				k.emit(0, byte(k.len-1), k.last)
+				k.last = b
+				k.len = 1
+			case b == k.last:
+				k.len++
+			}
+		case k.len == 256: // emit now !
+			k.emit(0, 255, k.last)
+			k.last = b
+			k.len = 1
+		default:
+			panic("internal error")
 		}
-
-		// emit immediately the rest
-		out.WriteByte(b)
-		k.len = 0
-		k.last = 0
 
 	}
+	return len(buf), nil
+}
+
+// Close the writer, flushing remaining data if any, then closing.
+func (k *krlenWriter) Close() error {
+
+	switch {
+	case k.len == 0: // do nothing
+	case k.last == 0 && k.len == 1:
+		k.emit(0, 0)
+	case k.last == 0 && k.len == 2:
+		k.emit(0, 1, 0)
+	case k.last != 0 && k.len == 1:
+		k.emit(k.last)
+	case k.last != 0 && k.len == 2:
+		k.emit(k.last, k.last)
+	case k.len <= 256:
+		k.emit(0, byte(k.len-1), k.last)
+	default:
+		fmt.Printf("Invalid state : len = %d, last = %02X\n", k.len, k.last)
+		panic("invalid state")
+	}
+	return k.kwriter.Close()
 }

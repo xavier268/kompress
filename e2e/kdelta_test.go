@@ -1,10 +1,10 @@
-package test
+package e2e
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/xavier268/kompress/klog"
+	"github.com/xavier268/kompress"
 )
 
 func TestKDeltaBasicWriter(t *testing.T) {
@@ -12,7 +12,7 @@ func TestKDeltaBasicWriter(t *testing.T) {
 	source := "abcabcabcdabcdeaaacbaa"
 	res := bytes.NewBuffer(nil)
 
-	k := klog.NewKdeltaWriter(klog.NewKrlenWriter(klog.NewKlogWriter(res)), 2)
+	k := kompress.NewKdeltaWriter(kompress.NewKrlenWriter(kompress.NewKlogWriter(res)), 2)
 	n, err := k.Write([]byte(source))
 	k.Close()
 

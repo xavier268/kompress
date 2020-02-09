@@ -1,4 +1,44 @@
-package kompress
+package e2e
+
+import (
+	"bytes"
+	"fmt"
+	"testing"
+
+	"github.com/xavier268/kompress"
+)
+
+func TestBasicKrlenWriter(t *testing.T) {
+
+	source := "abbbbcd"
+	res := bytes.NewBuffer(nil)
+
+	k := kompress.NewKlogWriter(kompress.NewKrlenWriter(kompress.NewKlogWriter(res)))
+	n, e := k.Write([]byte(source))
+	if e != nil || n != len(source) {
+		fmt.Println(e, n, "<>", len(source))
+		t.Fail()
+	}
+}
+
+func TestData(t *testing.T) {
+	data := getTestData()
+	for i := 0; i < len(data); i += 2 {
+		res := bytes.NewBuffer(nil)
+		k := kompress.NewKrlenWriter(res)
+		n, e := k.Write(data[i])
+		k.Close() // IMPORTANT !!!
+		if n != len(data[i]) || e != nil {
+			fmt.Println(e, n, "<>", len(data[i]))
+			t.Fail()
+		}
+		if bytes.Compare(res.Bytes(), data[i+1]) != 0 {
+			fmt.Printf("Expected : %v\n", data[i])
+			fmt.Printf("Got      : %v\n", res.Bytes())
+			t.Fail()
+		}
+	}
+}
 
 func getTestData() [][]byte {
 	data := [][]byte{

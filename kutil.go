@@ -1,4 +1,4 @@
-package klog
+package kompress
 
 import (
 	"errors"

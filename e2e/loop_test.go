@@ -1,4 +1,4 @@
-package test
+package e2e
 
 import (
 	"bytes"
@@ -6,15 +6,15 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/xavier268/kompress/klog"
+	"github.com/xavier268/kompress"
 )
 
 func TestCompressDecompressKDelta(t *testing.T) {
 
 	res := bytes.NewBuffer(nil)
 
-	w := klog.NewKdeltaWriter(res, 4)
-	r := klog.NewKdeltaReader(res, 4)
+	w := kompress.NewKdeltaWriter(res, 4)
+	r := kompress.NewKdeltaReader(res, 4)
 
 	compressDecompress(t, w, r)
 
@@ -24,8 +24,8 @@ func TestCompressDecompressKrlen(t *testing.T) {
 
 	res := bytes.NewBuffer(nil)
 
-	w := klog.NewKrlenWriter(res)
-	r := klog.NewKrlenReader(res)
+	w := kompress.NewKrlenWriter(res)
+	r := kompress.NewKrlenReader(res)
 
 	compressDecompress(t, w, r)
 
