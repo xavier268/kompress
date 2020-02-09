@@ -9,11 +9,14 @@ import (
 
 // KrlenWriter is a compressor for encoding repeated bytes.
 // It encodes using an escape byte, <esc>
-// x or xx  where x != <esc>, is unchanged
-// <esc> (single esc) is encoded as <esc><0>
-// <esc><esc> is encoded as <esc><1><esc>
-// xxx... is encoded as <esc><l><x>, where 2 <= l <= 255
-// <esc><esc><esc> ... is encoded as <esc><l><esc>, where 2 <= l <= 255
+// The escape byte is dynamically selected, among the least used bytes.
+//
+// 		x or xx  where x != <esc>, is unchanged
+// 		<esc> (single esc) is encoded as <esc><0>
+// 		<esc><esc> is encoded as <esc><1><esc>
+// 		xxx... is encoded as <esc><l><x>, where 2 <= l <= 255
+// 		<esc><esc><esc> ... is encoded as <esc><l><esc>, where 2 <= l <= 255
+//
 // where l is the length of the sequence minus 1 ( l==2, means a sequence of 3, as in xxx)
 // so, the max sequence that can be encoded is 255 + 1 = 256
 type krlenWriter struct {

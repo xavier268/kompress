@@ -16,7 +16,7 @@ func TestCompressDecompressKDelta(t *testing.T) {
 	w := kompress.NewKdeltaWriter(res, 4)
 	r := kompress.NewKdeltaReader(res, 4)
 
-	compressDecompress(t, w, r)
+	compressDecompress(t, getSourceRnd(t, 2000), w, r)
 
 }
 
@@ -27,40 +27,38 @@ func TestCompressDecompressKrlen(t *testing.T) {
 	w := kompress.NewKrlenWriter(res)
 	r := kompress.NewKrlenReader(res)
 
-	compressDecompress(t, w, r)
+	compressDecompress(t, getSourceRnd(t, 2000), w, r)
 
 }
 
-func compressDecompress(t *testing.T, w io.WriteCloser, r io.Reader) {
-
+func getSourceRnd(t *testing.T, size int) []byte {
 	rnd := rand.New(rand.NewSource(42))
-
-	buf := make([]byte, 2000)
+	buf := make([]byte, size)
 	n, e := rnd.Read(buf)
 	if n != len(buf) || e != nil {
 		t.Fatal("could not read rnd bytes")
 	}
+	return buf
+}
 
-	n, e = w.Write(buf[:1000])
-	if n != 1000 || e != nil {
-		t.Fatal("could not write all the bytes(1)")
+func compressDecompress(t *testing.T, source []byte, w io.WriteCloser, r io.Reader) {
+
+	n, e := w.Write(source)
+	if n != len(source) || e != nil {
+		t.Fatal("could not write all the bytes")
 	}
-	n, e = w.Write(buf[1000:])
-	if n != 1000 || e != nil {
-		t.Fatal("could not write all the bytes(2)")
-	}
-	e = w.Close()
+	e = w.Close() // IMPORTANT !
 	if e != nil {
 		t.Fatal("could not close writer")
 	}
 
-	buf2 := make([]byte, 2000)
+	buf2 := make([]byte, len(source))
 	n, e = r.Read(buf2)
 	if n != len(buf2) || e != nil {
 		t.Fatal("could not read all bytes")
 	}
 
-	if bytes.Compare(buf, buf2) != 0 {
+	if bytes.Compare(source, buf2) != 0 {
 		t.Fatal("bytes do not match")
 	}
 
