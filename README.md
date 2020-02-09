@@ -3,6 +3,9 @@
 Compression engines (complementing / improving go-gzip package)
 
 The API is similar to the gzip golang package : you first construct a writer (resp. a reader) and then write (resp. read) through it to compress (resp. decompress) your data.
+It is essential to Close the Writer when finished, to ensure data is flushed.
+
+For perfomance, you may want to buffer io.Writer and io.Reader. This is not taken care of by the engines.
 
 You may use these engines to preprocess data before it is gziped, or to replace gzip completely.
 
@@ -32,7 +35,5 @@ and will encode the delta. This is a way to detect possibly long sequences far a
 
 Local compression.
 
-It encodes the bytes using a variable length system.
-To select how to encode, it dynamically adjust based on bytes frequency.
-
+It encodes the bytes using a adaptative huffman coding variable bit encoding.
 
