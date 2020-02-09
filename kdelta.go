@@ -2,7 +2,6 @@ package kompress
 
 import (
 	"io"
-	"os"
 )
 
 type kdelta struct {
@@ -10,6 +9,13 @@ type kdelta struct {
 	capa    int          // max capacity of the buffer
 	exp     map[int]byte // expected bytes for a givent context hash
 	hashmax int          // max size of the hash map
+}
+
+func (k *kdelta) reset(capa int) {
+	k.capa = capa
+	k.hashmax = 1000 * k.capa
+	k.exp = make(map[int]byte, 1000)
+	k.buf = make([]byte, 0, k.capa)
 }
 
 type kdeltaWriter struct {
@@ -26,31 +32,19 @@ type kdeltaReader struct {
 func NewKdeltaWriter(w io.Writer, capa int) io.WriteCloser {
 
 	k := new(kdeltaWriter)
-	k.capa = capa
-	if w == nil {
-		k.writer = os.Stdout
-	} else {
-		k.writer = w
-	}
-	k.hashmax = 1000 * k.capa
-	k.exp = make(map[int]byte, 1000)
-	k.buf = make([]byte, 0, k.capa)
+	k.kwriter.reset(w)
+	k.kdelta.reset(capa)
+
 	return k
 }
 
 // NewKdeltaReader constructs an io.Reader that will retrieve original bytes from delta encoded bytes.
-func NewKdeltaReader(w io.Reader, capa int) io.Reader {
+func NewKdeltaReader(r io.Reader, capa int) io.Reader {
 
 	k := new(kdeltaReader)
-	k.capa = capa
-	if w == nil {
-		k.reader = os.Stdout
-	} else {
-		k.reader = w
-	}
-	k.hashmax = 1000 * k.capa
-	k.exp = make(map[int]byte, 1000)
-	k.buf = make([]byte, 0, k.capa)
+	k.kreader.reset(r)
+	k.kdelta.reset(capa)
+
 	return k
 }
 

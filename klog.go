@@ -3,17 +3,13 @@ package kompress
 import (
 	"fmt"
 	"io"
-	"os"
 )
 
 // NewKlogReader constructs a new Klog Reader
 // nil reader will read from stdin.
 func NewKlogReader(r io.Reader) io.Reader {
 	rr := new(klogReader)
-	rr.reader = r
-	if r == nil {
-		rr.reader = os.Stdin
-	}
+	rr.kreader.reset(r)
 	return rr
 }
 
@@ -21,10 +17,7 @@ func NewKlogReader(r io.Reader) io.Reader {
 // nil sends to stdout.
 func NewKlogWriter(w io.Writer) io.WriteCloser {
 	rr := new(klogWriter)
-	rr.writer = w
-	if w == nil {
-		rr.writer = os.Stdout
-	}
+	rr.kwriter.reset(w)
 	return rr
 }
 

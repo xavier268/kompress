@@ -16,6 +16,24 @@ type kreader struct {
 	err    error
 }
 
+func (k *kwriter) reset(w io.Writer) {
+	k.err = nil
+	if w == nil {
+		k.writer = os.Stdout
+	} else {
+		k.writer = w
+	}
+}
+
+func (k *kreader) reset(r io.Reader) {
+	k.err = nil
+	if r == nil {
+		k.reader = os.Stdin
+	} else {
+		k.reader = r
+	}
+}
+
 // Close flush all data, and attempt to close underlying writer,
 // if it is possible.
 func (k *kwriter) Close() error {

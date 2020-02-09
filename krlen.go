@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 )
 
 // KrlenWriter is a compressor for encoding repeated bytes.
@@ -38,22 +37,14 @@ type krlenReader struct {
 // Ensure you close it at the end, to flush pending bytes.
 func NewKrlenWriter(w io.Writer) io.WriteCloser {
 	k := new(krlenWriter)
-	if w == nil {
-		k.writer = os.Stdout
-	} else {
-		k.writer = w
-	}
+	k.kwriter.reset(w)
 	return k
 }
 
 // NewKrlenReader will create a reader that decompress run-length sequences.
 func NewKrlenReader(r io.Reader) io.Reader {
 	k := new(krlenReader)
-	if r == nil {
-		k.reader = os.Stdin
-	} else {
-		k.reader = r
-	}
+	k.kreader.reset(r)
 	return k
 }
 
