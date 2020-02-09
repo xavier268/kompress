@@ -75,7 +75,8 @@ func (bb *BitBuffer) ReadBit() (byte, error) {
 }
 
 // ReadByte reads a single byte from buffer.
-// Error if cannot read at least 8 bits.
+// Error if cannot read at least 8 bits,
+// in which case NO BIT is read.
 func (bb *BitBuffer) ReadByte() (byte, error) {
 	var b byte
 	if bb.Size() < 8 {
@@ -94,6 +95,27 @@ func (bb *BitBuffer) ReadByte() (byte, error) {
 		}
 	}
 	return b, nil
+}
+
+// ReadBytePadded reads the bits in a byte,
+// padded with zero on the right.
+// n is the number of bits successfully read.
+func (bb *BitBuffer) ReadBytePadded() (b byte, n int) {
+
+	for i := 128; i > 0; i >>= 1 {
+		// DEBUG
+		// fmt.Printf("%08b\n", i)
+
+		bit, err := bb.ReadBit()
+		if err != nil {
+			return b, n
+		}
+		if bit != 0 {
+			b |= byte(i)
+		}
+		n++
+	}
+	return b, n
 }
 
 // WriteByte write the corresponding bits in the buffer.
