@@ -12,11 +12,18 @@ import (
 func TestCompressDecompressKDelta(t *testing.T) {
 
 	res := bytes.NewBuffer(nil)
-
 	w := kompress.NewKdeltaWriter(res, 4)
 	r := kompress.NewKdeltaReader(res, 4)
 
 	compressDecompress(t, getSourceRnd(t, 2000), w, r)
+
+	data := getKrlenTestData()
+	for _, d := range data {
+		res = bytes.NewBuffer(nil)
+		w = kompress.NewKdeltaWriter(res, 4)
+		r = kompress.NewKdeltaReader(res, 4)
+		compressDecompress(t, d, w, r)
+	}
 
 }
 
@@ -28,6 +35,14 @@ func TestCompressDecompressKrlen(t *testing.T) {
 	r := kompress.NewKrlenReader(res)
 
 	compressDecompress(t, getSourceRnd(t, 2000), w, r)
+
+	data := getKrlenTestData()
+	for _, d := range data {
+		res = bytes.NewBuffer(nil)
+		w = kompress.NewKrlenWriter(res)
+		r = kompress.NewKrlenReader(res)
+		compressDecompress(t, d, w, r)
+	}
 
 }
 

@@ -23,7 +23,7 @@ func TestBasicKrlenWriter(t *testing.T) {
 }
 
 func TestDataKrlenCompress(t *testing.T) {
-	data := getTestData()
+	data := getKrlenTestData()
 	for i := 0; i < len(data); i += 2 {
 		res := bytes.NewBuffer(nil)
 		k := kompress.NewKrlenWriter(res)
@@ -42,7 +42,7 @@ func TestDataKrlenCompress(t *testing.T) {
 	}
 }
 func TestDataKrlenDecompress(t *testing.T) {
-	data := getTestData()
+	data := getKrlenTestData()
 	for i := 0; i < len(data); i += 2 {
 		k := kompress.NewKrlenReader(bytes.NewReader(data[i+1]))
 		res, e := ioutil.ReadAll(k)
@@ -58,7 +58,7 @@ func TestDataKrlenDecompress(t *testing.T) {
 	}
 }
 
-func getTestData() [][]byte {
+func getKrlenTestData() [][]byte {
 	data := [][]byte{
 		{1}, {1},
 		{1, 2}, {1, 2},

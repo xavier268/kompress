@@ -63,6 +63,21 @@ func (k *kdelta) hash() int {
 	return r
 }
 
+// expect gets the expected byte for the given context hash.
+func (k *kdelta) expect(h int) byte {
+	return k.exp[h]
+}
+
+// learn provides context learning info
+// it also updates the context buffer.
+func (k *kdelta) learn(h int, b byte) {
+	k.exp[h] = b
+	k.buf = append(k.buf, b)
+	if len(k.buf) > k.capa {
+		k.buf = k.buf[1:]
+	}
+}
+
 // Write will produce the delta encoded bytes.
 func (k *kdeltaWriter) Write(bb []byte) (int, error) {
 
@@ -76,7 +91,7 @@ func (k *kdeltaWriter) Write(bb []byte) (int, error) {
 
 		// compute context, get expected byte
 		h := k.hash()
-		e := k.exp[h]
+		e := k.expect(h)
 
 		// compute delta, write it
 		d := e ^ b
@@ -87,11 +102,7 @@ func (k *kdeltaWriter) Write(bb []byte) (int, error) {
 		count++
 
 		// update expected byte and context
-		k.exp[h] = b
-		k.buf = append(k.buf, b)
-		if len(k.buf) > k.capa {
-			k.buf = k.buf[1:]
-		}
+		k.learn(h, b)
 	}
 
 	return count, k.err
@@ -120,18 +131,14 @@ func (k *kdeltaReader) Read(bb []byte) (int, error) {
 
 		// compute context, get expected byte
 		h = k.hash()
-		e = k.exp[h]
+		e = k.expect(h)
 
 		// compute true value b, write it
 		b = e ^ d
 		bb[i] = b
 
 		// update expected byte and context
-		k.exp[h] = b
-		k.buf = append(k.buf, b)
-		if len(k.buf) > k.capa {
-			k.buf = k.buf[1:]
-		}
+		k.learn(h, b)
 	}
 	return count, err
 }
