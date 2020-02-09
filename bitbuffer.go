@@ -48,7 +48,11 @@ func (bb *BitBuffer) WriteBit(b byte) {
 }
 
 // ReadBit from buffer, in fifo order.
-func (bb *BitBuffer) ReadBit() byte {
+func (bb *BitBuffer) ReadBit() (byte, error) {
+
+	if bb.Size() <= 0 {
+		return 0, errors.New("bitbuffer underflow")
+	}
 
 	bb.size--
 	bb.offset++
@@ -65,9 +69,9 @@ func (bb *BitBuffer) ReadBit() byte {
 	}
 
 	if b == 0 {
-		return 0
+		return 0, nil
 	}
-	return 1
+	return 1, nil
 }
 
 // ReadByte reads a single byte from buffer.
@@ -81,7 +85,11 @@ func (bb *BitBuffer) ReadByte() (byte, error) {
 		// DEBUG
 		// fmt.Printf("%08b\n", i)
 
-		if bb.ReadBit() == 1 {
+		bit, err := bb.ReadBit()
+		if err != nil {
+			return b, err
+		}
+		if bit != 0 {
 			b |= byte(i)
 		}
 	}
