@@ -8,22 +8,24 @@ import (
 )
 
 // KrlenWriter is a compressor for encoding repeated bytes.
-// It encodes the following way :
-// x or xx  where x != 0, is unchanged
-// 0 (single zero) is encoded as <0><0>
-// 00 is encoded as <0><1><0>
-// xxx... is encoded as <0><l><x>, where 2 <= l <= 255
-// 000... is encoded as <0><l><0>, where 2 <= l <= 255
+// It encodes using an escape byte, <esc>
+// x or xx  where x != <esc>, is unchanged
+// <esc> (single esc) is encoded as <esc><0>
+// <esc><esc> is encoded as <esc><1><esc>
+// xxx... is encoded as <esc><l><x>, where 2 <= l <= 255
+// <esc><esc><esc> ... is encoded as <esc><l><esc>, where 2 <= l <= 255
 // where l is the length of the sequence minus 1 ( l==2, means a sequence of 3, as in xxx)
 // so, the max sequence that can be encoded is 255 + 1 = 256
 type krlenWriter struct {
 	kwriter
+	kfreq
 	last byte // Last byte seen
 	len  int  // Sequence length so far ...
 }
 
 type krlenReader struct {
 	kreader
+	kfreq
 	// buffer available for the next read
 	// since we may have too many bytes to send at once.
 	buf []byte
@@ -70,13 +72,14 @@ func (k *krlenReader) Read(res []byte) (int, error) {
 			break
 		}
 		switch b {
-		case 0:
+		case k.esc:
 			bb, e := k.readByte()
 			switch {
 			case e != nil:
 				k.err = errors.New(e.Error() + " : invalid compression format")
 			case bb == 0:
-				k.buf = append(k.buf, 0) // single zero
+				k.buf = append(k.buf, k.esc) // single escape
+				k.update(k.esc)
 			default:
 				x, e := k.readByte()
 				if e != nil {
@@ -84,13 +87,15 @@ func (k *krlenReader) Read(res []byte) (int, error) {
 				} else {
 					for i := 0; i < int(bb)+1; i++ {
 						k.buf = append(k.buf, x)
+						k.update(x)
 					}
+
 				}
 			}
 
 		default:
 			k.buf = append(k.buf, b)
-
+			k.update(b)
 		}
 
 	}
@@ -137,27 +142,35 @@ func (k *krlenWriter) Write(buf []byte) (int, error) {
 			k.len = 1
 		case k.len == 1:
 			switch {
-			case k.last == 0 && b != k.last: // single zero
-				k.emit(0, 0)
+			case k.last != k.esc && b != k.last: // single non-escape
+				k.emit(k.last)
+				k.update(k.last)
 				k.last = b
 				k.len = 1
-			case k.last != 0 && b != k.last: // single non-zero
-				k.emit(k.last)
+			case k.last == k.esc && b != k.last: // single esc
+				k.emit(k.esc, 0)
+				k.update(k.last)
 				k.last = b
 				k.len = 1
 			case b == k.last:
 				k.len++
+				// dont update freq as we follow the sequence ...
 			default:
 				panic("internal error")
 			}
+
 		case k.len == 2:
 			switch {
-			case k.last != 0 && b != k.last: // double non zero
-				k.emit(k.last, k.last)
+			case k.last == k.esc && b != k.last: // double esc confirmed
+				k.emit(k.esc, 1, k.esc)
+				k.update(k.last)
+				k.update(k.last)
 				k.last = b
 				k.len = 1
-			case k.last == 0 && b != k.last: // double zero confirmed
-				k.emit(0, 1, 0)
+			case k.last != k.esc && b != k.last: // double non esc
+				k.emit(k.last, k.last)
+				k.update(k.last)
+				k.update(k.last)
 				k.last = b
 				k.len = 1
 			case b == k.last:
@@ -168,14 +181,20 @@ func (k *krlenWriter) Write(buf []byte) (int, error) {
 		case k.len > 2 && k.len < 256:
 			switch {
 			case b != k.last:
-				k.emit(0, byte(k.len-1), k.last)
+				k.emit(k.esc, byte(k.len-1), k.last)
+				for i := 0; i < k.len; i++ {
+					k.update(k.last)
+				}
 				k.last = b
 				k.len = 1
 			case b == k.last:
 				k.len++
 			}
 		case k.len == 256: // emit now !
-			k.emit(0, 255, k.last)
+			k.emit(k.esc, 255, k.last)
+			for i := 0; i < 256; i++ {
+				k.update(k.last)
+			}
 			k.last = b
 			k.len = 1
 		default:
@@ -191,16 +210,16 @@ func (k *krlenWriter) Close() error {
 
 	switch {
 	case k.len == 0: // do nothing
-	case k.last == 0 && k.len == 1:
-		k.emit(0, 0)
-	case k.last == 0 && k.len == 2:
-		k.emit(0, 1, 0)
-	case k.last != 0 && k.len == 1:
+	case k.last == k.esc && k.len == 1:
+		k.emit(k.esc, 0)
+	case k.last == k.esc && k.len == 2:
+		k.emit(k.esc, 1, k.esc)
+	case k.last != k.esc && k.len == 1:
 		k.emit(k.last)
-	case k.last != 0 && k.len == 2:
+	case k.last != k.esc && k.len == 2:
 		k.emit(k.last, k.last)
 	case k.len <= 256:
-		k.emit(0, byte(k.len-1), k.last)
+		k.emit(k.esc, byte(k.len-1), k.last)
 	default:
 		fmt.Printf("Invalid state : len = %d, last = %02X\n", k.len, k.last)
 		panic("invalid state")

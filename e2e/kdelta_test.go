@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/xavier268/kompress"
@@ -12,7 +13,7 @@ func TestKDeltaBasicWriter(t *testing.T) {
 	source := "abcabcabcdabcdeaaacbaa"
 	res := bytes.NewBuffer(nil)
 
-	k := kompress.NewKdeltaWriter(kompress.NewKrlenWriter(kompress.NewKlogWriter(res)), 2)
+	k := kompress.NewKdeltaWriter(kompress.NewKlogWriter(res), 2)
 	n, err := k.Write([]byte(source))
 	k.Close()
 
@@ -20,6 +21,7 @@ func TestKDeltaBasicWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res.Bytes()) != len(source) {
-		t.Fail()
+		fmt.Println("\nSize went from ", len(source), " to ", len(res.Bytes()))
+		t.Fatal("not the same byte length")
 	}
 }

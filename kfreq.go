@@ -24,6 +24,8 @@ func (f *kfreq) update(b byte) {
 				// There acn not be better values, only same values,
 				// so we can safely return immediately.
 				f.esc = byte(i)
+				// DEBUG
+				// fmt.Println("\nEsc was changed to ", f.esc)
 				return
 			}
 		}

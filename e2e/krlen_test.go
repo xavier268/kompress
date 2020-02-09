@@ -3,6 +3,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/xavier268/kompress"
@@ -21,7 +22,7 @@ func TestBasicKrlenWriter(t *testing.T) {
 	}
 }
 
-func TestData(t *testing.T) {
+func TestDataKrlenCompress(t *testing.T) {
 	data := getTestData()
 	for i := 0; i < len(data); i += 2 {
 		res := bytes.NewBuffer(nil)
@@ -33,8 +34,25 @@ func TestData(t *testing.T) {
 			t.Fail()
 		}
 		if bytes.Compare(res.Bytes(), data[i+1]) != 0 {
-			fmt.Printf("Expected : %v\n", data[i])
-			fmt.Printf("Got      : %v\n", res.Bytes())
+			fmt.Printf("%d\tFrom     : %v\n", i, data[i])
+			fmt.Printf("%d\tExpected : %v\n", i, data[i+1])
+			fmt.Printf("%d\tGot      : %v\n", i, res.Bytes())
+			t.Fail()
+		}
+	}
+}
+func TestDataKrlenDecompress(t *testing.T) {
+	data := getTestData()
+	for i := 0; i < len(data); i += 2 {
+		k := kompress.NewKrlenReader(bytes.NewReader(data[i+1]))
+		res, e := ioutil.ReadAll(k)
+
+		if e != nil {
+			t.Fatal(e)
+		}
+		if bytes.Compare(res, data[i]) != 0 {
+			fmt.Printf("%d\tExpected : %v\n", i, data[i])
+			fmt.Printf("%d\tGot      : %v\n", i, res)
 			t.Fail()
 		}
 	}
@@ -57,8 +75,8 @@ func getTestData() [][]byte {
 		{1, 3, 3, 3}, {1, 0, 2, 3},
 		{1, 3, 3, 3, 4}, {1, 0, 2, 3, 4},
 		{1, 3, 3, 3, 0}, {1, 0, 2, 3, 0, 0},
-		{0, 1, 3, 3, 3, 0}, {0, 0, 1, 0, 2, 3, 0, 0},
-		{0, 3, 3, 3, 0}, {0, 0, 0, 2, 3, 0, 0},
+		{0, 1, 3, 3, 3, 0}, {0, 0, 1, 0, 2, 2, 3, 0},
+		{0, 3, 3, 3, 0}, {0, 0, 1, 2, 3, 0},
 
 		{1, 8, 8, 5}, {1, 8, 8, 5},
 		{8, 8, 5}, {8, 8, 5},
