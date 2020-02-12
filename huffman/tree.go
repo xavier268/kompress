@@ -4,10 +4,31 @@ import "fmt"
 
 // node makes an huffman tree
 type node struct {
+	id     int
 	weight uint
 	parent *node
 	// child for 0 or 1 respectively
 	child0, child1 *node
+}
+
+func (n *node) String() string {
+	r := fmt.Sprintf("Node %d, weight %d \t", n.id, n.weight)
+	if n.parent == nil {
+		r += "parent :  \t"
+	} else {
+		r += fmt.Sprintf("parent : %d\t", n.parent.id)
+	}
+	if n.child0 == nil {
+		r += "child0 :  ,\t"
+	} else {
+		r += fmt.Sprintf("child0 : %d,\t", n.child0.id)
+	}
+	if n.child1 == nil {
+		r += "child1 :  "
+	} else {
+		r += fmt.Sprintf("child1 : %d", n.child1.id)
+	}
+	return r
 }
 
 // Engine to handle huffman trees.
@@ -19,20 +40,15 @@ type Engine struct {
 	// nodes gather all nodes,
 	// fisrt, leaf nodes, one by Symbol,
 	// then the rest of the nodes, including the root, as the last one.
-	nodes []*node
+	nodes []node
 }
-
-/* func (n *node) String() string {
-	return fmt.Sprintf("Node: %4p (weight : %d) \tpar: %4p\t childs: %4p\t%4p ",
-		n, n.weight, n.parent, n.child0, n.child1)
-} */
 
 func (e *Engine) String() string {
 	r := fmt.Sprintf("Number of symbol :\t%d\n", e.len)
-	for _, n := range e.nodes {
-		r += fmt.Sprintf("\n%p\t%+v", n, n)
+	for n := range e.nodes {
+		r += fmt.Sprintln(e.nodes[n].String())
 	}
-	r += fmt.Sprintf("\n\nroot : %p\t%+v", e.root, e.root)
+	r += fmt.Sprintln("root:\n", e.root.String())
 	return r
 }
 
@@ -42,9 +58,9 @@ func (e *Engine) String() string {
 func New(weights []int) *Engine {
 	e := new(Engine)
 	e.len = len(weights)
-	e.nodes = make([]*node, 2*e.len-1, 2*e.len-1)
+	e.nodes = make([]node, 2*e.len-1, 2*e.len-1)
 	for i := range e.nodes {
-		e.nodes[i] = new(node)
+		e.nodes[i].id = i
 		if i < e.len {
 			e.nodes[i].weight = uint(weights[i])
 		}
@@ -58,8 +74,8 @@ func New(weights []int) *Engine {
 // Leaf weights are unchanged.
 func (e *Engine) makeTree() {
 	e.root = nil
-	// reset existing leaves
-	for _, n := range e.nodes[:e.len] {
+	// reset all parent to zero
+	for _, n := range e.nodes {
 		n.parent = nil
 	}
 	// loop until all node capacity have been used
@@ -69,45 +85,48 @@ func (e *Engine) makeTree() {
 		// find the lowest weight node among
 		// the leaves and those that have been constructed,
 		// but that do not have a parent yet
-		var n0, n1 *node
+		i0, i1 := -1, -1
 		var w0, w1 uint
-		for _, n := range e.nodes {
-			if n0 == nil {
-				n0 = n
-				w0 = n.weight
-				continue
+		for i := 0; i < alloc; i++ {
+			if e.nodes[i].parent == nil && i0 < 0 {
+				i0 = i
+				w0 = e.nodes[i].weight
 			}
-			if n.parent == nil && n.weight < w0 {
-				n0 = n
-				w0 = n.weight
+			if e.nodes[i].parent == nil && i0 >= 0 && e.nodes[i].weight < w0 {
+				i0 = i
+				w0 = e.nodes[i].weight
 			}
 		}
-		if n0 == nil {
+		if i0 < 0 {
 			panic("internal logic error")
 		}
 		// same for second node, distinct ...
-		for _, n := range e.nodes {
-			if n1 == nil {
-				n1 = n
-				w1 = n.weight
-				continue
+		for i := 0; i < alloc; i++ {
+			if e.nodes[i].parent == nil && i1 < 0 && i != i0 {
+				i1 = i
+				w1 = e.nodes[i].weight
 			}
-			if n.parent == nil && n.weight < w1 && n != n0 {
-				n1 = n
-				w1 = n.weight
+			if e.nodes[i].parent == nil && e.nodes[i].weight < w1 && i != i0 {
+				i1 = i
+				w1 = e.nodes[i].weight
 			}
 		}
-		if n1 == nil {
+		if i1 < 0 {
 			panic("internal logic error")
 		}
 		// create parent, reading beyond length, but within capacity ...
-		p := e.nodes[alloc]
-		p.weight = n0.weight + n1.weight
-		p.child0 = n0
-		p.child1 = n1
-		n0.parent, n1.parent = p, p
+		fmt.Println("i0, i1 = ", i0, " , ", i1)
+
+		e.nodes[alloc].weight = e.nodes[i0].weight + e.nodes[i1].weight
+		e.nodes[alloc].child0 = &e.nodes[i0]
+		e.nodes[alloc].child1 = &e.nodes[i1]
+		e.nodes[i0].parent, e.nodes[i1].parent = &e.nodes[alloc], &e.nodes[alloc]
+
+		fmt.Println("Using    : ", e.nodes[i0].String())
+		fmt.Println("Using    : ", e.nodes[i1].String())
+		fmt.Println("Using (p): ", e.nodes[alloc].String())
 
 		// root is last node created
-		e.root = p
+		e.root = &e.nodes[alloc]
 	}
 }
