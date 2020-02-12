@@ -1,6 +1,9 @@
 package huffman
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // node makes an huffman tree
 type node struct {
@@ -129,4 +132,50 @@ func (e *Engine) makeTree() {
 		// root is last node created
 		e.root = &e.nodes[alloc]
 	}
+}
+
+// dump a symbol encoding, upwards
+// POC
+func (n *node) encode(from *node) {
+
+	if n.parent != nil {
+		n.parent.encode(n)
+	}
+
+	switch from {
+	case nil: // ignore from nil
+	case n.child0:
+		fmt.Println(" ->0")
+	case n.child1:
+		fmt.Println(" ->1")
+	}
+}
+
+// POC for decoding a symbole
+func (e *Engine) decode(n *node, bits ...Bit) (Symbol, error) {
+
+	if len(bits) == 0 {
+		if n.id < e.len {
+			return Symbol(n.id), nil
+		}
+		return Symbol(n.id), errors.New("decoding stopped on a non symbol leaf ! ")
+	}
+
+	if n == nil {
+		return 0, errors.New("decoding outside of the tree ")
+	}
+
+	switch bits[0] {
+	case 0:
+		if n.child0 == nil {
+			return Symbol(n.id), nil
+		}
+		return e.decode(n.child0, bits[1:]...)
+	case 1:
+		if n.child1 == nil {
+			return Symbol(n.id), nil
+		}
+		return e.decode(n.child0, bits[1:]...)
+	}
+	panic("internal error")
 }
