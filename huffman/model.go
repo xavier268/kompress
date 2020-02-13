@@ -12,6 +12,7 @@ type Symbol uint
 // BitWriteCloser allows wrinting bits.
 type BitWriteCloser interface {
 	WriteBit(Bit) error
+	WriteBits(b ...Bit) error
 	io.Closer
 }
 

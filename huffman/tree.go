@@ -1,7 +1,6 @@
 package huffman
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -34,10 +33,12 @@ func (n *node) String() string {
 	return r
 }
 
-// Engine to handle huffman trees.
-type Engine struct {
+// engine to handle huffman trees.
+type engine struct {
 	// Symbol alphabet size, number of leaves
 	len int
+	// eof is an application level eof Symbol, part of the Alphabet
+	eof Symbol
 	// root node
 	root *node
 	// nodes gather all nodes,
@@ -46,20 +47,12 @@ type Engine struct {
 	nodes []node
 }
 
-func (e *Engine) String() string {
-	r := fmt.Sprintf("Number of symbol :\t%d\n", e.len)
-	for n := range e.nodes {
-		r += fmt.Sprintln(e.nodes[n].String())
-	}
-	r += fmt.Sprintln("root:\n", e.root.String())
-	return r
-}
-
-// New creates a new engine, with the initial weights provided.
+// newEngine creates a new engine, with the initial weights provided.
 // There should be exactly or more weights provided than the alphabet size.
 // All weight value should be positive or zero.
-func New(weights []int) *Engine {
-	e := new(Engine)
+func newEngine(weights []int, eof Symbol) *engine {
+	e := new(engine)
+	e.eof = eof
 	e.len = len(weights)
 	e.nodes = make([]node, 2*e.len-1, 2*e.len-1)
 	for i := range e.nodes {
@@ -75,7 +68,7 @@ func New(weights []int) *Engine {
 // makeTree computes the huffman tree.
 // No allocation is made, nodes are reused.
 // Leaf weights are unchanged.
-func (e *Engine) makeTree() {
+func (e *engine) makeTree() {
 	e.root = nil
 	// reset all parent to zero
 	for _, n := range e.nodes {
@@ -118,64 +111,40 @@ func (e *Engine) makeTree() {
 			panic("internal logic error")
 		}
 		// create parent, reading beyond length, but within capacity ...
-		fmt.Println("i0, i1 = ", i0, " , ", i1)
+		// fmt.Println("i0, i1 = ", i0, " , ", i1)
 
 		e.nodes[alloc].weight = e.nodes[i0].weight + e.nodes[i1].weight
 		e.nodes[alloc].child0 = &e.nodes[i0]
 		e.nodes[alloc].child1 = &e.nodes[i1]
 		e.nodes[i0].parent, e.nodes[i1].parent = &e.nodes[alloc], &e.nodes[alloc]
 
-		fmt.Println("Using    : ", e.nodes[i0].String())
-		fmt.Println("Using    : ", e.nodes[i1].String())
-		fmt.Println("Using (p): ", e.nodes[alloc].String())
+		//fmt.Println("Using    : ", e.nodes[i0].String())
+		//fmt.Println("Using    : ", e.nodes[i1].String())
+		//fmt.Println("Using (p): ", e.nodes[alloc].String())
 
 		// root is last node created
 		e.root = &e.nodes[alloc]
 	}
 }
 
-// dump a symbol encoding, upwards
-// POC
-func (n *node) encode(from *node) {
+func (e *engine) Dump() {
+	fmt.Println("Dumping huffman tree ( ", e.len, " symbols, eof is ", e.eof, " )")
+	var freq []int
 
-	if n.parent != nil {
-		n.parent.encode(n)
+	for i := 0; i < e.len; i++ {
+		freq = append(freq, int(e.nodes[i].weight))
 	}
+	lw := new(LogWriter)
+	w := NewWriter(lw, 0, freq)
 
-	switch from {
-	case nil: // ignore from nil
-	case n.child0:
-		fmt.Println(" ->0")
-	case n.child1:
-		fmt.Println(" ->1")
-	}
-}
-
-// POC for decoding a symbole
-func (e *Engine) decode(n *node, bits ...Bit) (Symbol, error) {
-
-	if len(bits) == 0 {
-		if n.id < e.len {
-			return Symbol(n.id), nil
+	for i, f := range freq {
+		s := Symbol(i)
+		lw.WriteSymbol(s)
+		fmt.Printf("/weight %d => ", f)
+		err := w.WriteSymbol(s)
+		if err != nil {
+			panic("unexpected write error ")
 		}
-		return Symbol(n.id), errors.New("decoding stopped on a non symbol leaf ! ")
+		fmt.Println()
 	}
-
-	if n == nil {
-		return 0, errors.New("decoding outside of the tree ")
-	}
-
-	switch bits[0] {
-	case 0:
-		if n.child0 == nil {
-			return Symbol(n.id), nil
-		}
-		return e.decode(n.child0, bits[1:]...)
-	case 1:
-		if n.child1 == nil {
-			return Symbol(n.id), nil
-		}
-		return e.decode(n.child0, bits[1:]...)
-	}
-	panic("internal error")
 }
