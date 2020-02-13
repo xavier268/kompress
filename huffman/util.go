@@ -99,3 +99,34 @@ func (bb *BitBuffer) Size() int {
 
 	return len(bb.bits)
 }
+
+// ReadByte reads a byte,
+// byte is 0 padded on the right in needed
+func (bb *BitBuffer) ReadByte() (byte, error) {
+
+	var by byte
+	var b Bit
+	var err error
+
+	for i := 0; i < 8; i++ {
+		by = by << 1
+		b, err = bb.ReadBit()
+		if err == nil {
+			by = by | byte(b)
+		}
+	}
+	return by, err
+}
+
+// WriteByte writes a byte, bit by bit.
+func (bb *BitBuffer) WriteByte(b byte) error {
+
+	var err error
+	var mask byte = byte(128)
+
+	for i := 0; i < 8; i++ {
+		err = bb.WriteBit(Bit(mask & b))
+		mask = mask / 2
+	}
+	return err
+}
