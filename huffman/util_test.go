@@ -7,48 +7,6 @@ import (
 	"testing"
 )
 
-func TestBitBuffer(t *testing.T) {
-
-	var err error
-
-	bb := new(BitBuffer)
-
-	if err = bb.WriteBit(1); err != nil {
-		t.Fatal(err)
-	}
-	if err = bb.WriteBit(0); err != nil {
-		t.Fatal(err)
-	}
-	if err = bb.WriteBit(5); err != nil {
-		t.Fatal(err)
-	}
-	if bb.Size() != 3 {
-		t.Fatal("wrong size : ", bb.Size())
-	}
-
-	b, err := bb.ReadBit()
-	if b != 1 || err != nil {
-		t.Fatal("invalid : ", b, err)
-	}
-	b, err = bb.ReadBit()
-	if b != 0 || err != nil {
-		t.Fatal("invalid : ", b, err)
-	}
-	b, err = bb.ReadBit()
-	if b != 1 || err != nil {
-		t.Fatal("invalid : ", b, err)
-	}
-	if bb.Size() != 0 {
-		t.Fatal("wrong size : ", bb.Size())
-	}
-
-	_, err = bb.ReadBit()
-	if err != io.EOF {
-		t.Fatal("exected io.EOF, but got ", err)
-	}
-
-}
-
 func TestBitBufferBytes1(t *testing.T) {
 
 	bb := NewBitBuffer()
@@ -122,15 +80,13 @@ func TestBitFromByteReader(t *testing.T) {
 	}
 }
 
-func TestBitToByteWriter(t *testing.T) {
+func TestBitToByteWriter1(t *testing.T) {
 
 	var source []Bit
 	var is, should []byte
 
-	source = []Bit{1, 0, 0, 1,
-		1, 1, 0, 1,
-		0, 1, 1, 0,
-		1, 1}
+	source = []Bit{1, 0, 0, 1, 1, 1, 0, 1,
+		0, 1, 1, 0, 1, 1}
 	should = []byte{0b_1001_1101, 0b_0110_1100}
 
 	buf := bytes.NewBuffer(is)
@@ -138,7 +94,7 @@ func TestBitToByteWriter(t *testing.T) {
 	w := NewBitToByteWriter(buf)
 	err := w.WriteBits(source...)
 
-	// Before close ...
+	// Before close, only firs byte ...
 	if bytes.Compare(should[:1], buf.Bytes()) != 0 || err != nil {
 		fmt.Println("\nsource:", source)
 		fmt.Println("got before close:", buf.Bytes())
@@ -156,5 +112,38 @@ func TestBitToByteWriter(t *testing.T) {
 		fmt.Println("error:", err)
 		t.Fatal(err)
 	}
+}
 
+func TestBitToByteWriter2(t *testing.T) {
+
+	var source []Bit
+	var is, should []byte
+
+	source = []Bit{1, 0, 0, 1, 1, 1, 0, 1,
+		0, 1, 1, 0, 1, 1, 0, 0}
+	should = []byte{0b_1001_1101, 0b_0110_1100}
+
+	buf := bytes.NewBuffer(is)
+
+	w := NewBitToByteWriter(buf)
+	err := w.WriteBits(source...)
+
+	// Before close, already full bytes..
+	if bytes.Compare(should[:2], buf.Bytes()) != 0 || err != nil {
+		fmt.Println("\nsource:", source)
+		fmt.Println("got before close:", buf.Bytes())
+		fmt.Println("want:", should)
+		fmt.Println("error:", err)
+		t.Fatal(err)
+	}
+
+	// close
+	w.Close()
+	if bytes.Compare(should, buf.Bytes()) != 0 || err != nil {
+		fmt.Println("\nsource:", source)
+		fmt.Println("got:", buf.Bytes())
+		fmt.Println("want:", should)
+		fmt.Println("error:", err)
+		t.Fatal(err)
+	}
 }
