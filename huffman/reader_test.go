@@ -50,6 +50,7 @@ func TestWriteRead3ExpectPanic(t *testing.T) {
 // writeReadSymbol will write all symbols,
 // log compression size, then read them back,
 // and check identity.
+// Update the tree each time.
 func writeReadSymbol(t *testing.T, syms []Symbol, eof Symbol, freq []int) {
 
 	buf := NewBitBuffer()

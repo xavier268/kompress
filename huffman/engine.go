@@ -58,7 +58,7 @@ type engine struct {
 func newEngine(weights []int, eof Symbol) *engine {
 	e := new(engine)
 	e.freq = weights
-	e.actfreq = append([]int(nil), weights...)
+	e.actfreq = append([]int(nil), weights...) // deep copy ...
 	e.eof = eof
 	e.len = len(weights)
 	e.nodes = make([]node, 2*e.len-1, 2*e.len-1)
