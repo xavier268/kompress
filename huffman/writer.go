@@ -25,10 +25,9 @@ func newWriter(bw BitWriteCloser, eof Symbol, weights []int) *hwriter {
 func (h *hwriter) Close() error {
 	h.err = h.WriteSymbol(h.eof)
 	if h.err != nil {
-
 		return h.err
 	}
-	h.err = h.Close()
+	h.err = h.bwriter.Close()
 	return h.err
 }
 

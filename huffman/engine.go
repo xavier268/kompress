@@ -50,10 +50,12 @@ type engine struct {
 	// fisrt, leaf nodes, one by Symbol,
 	// then the rest of the nodes, including the root, as the last one.
 	nodes []node
+	// decide if we should update the tree ?
+	scheduler func(e *engine) bool
 }
 
 // newEngine creates a new engine, with the initial weights provided.
-// There should be exactly or more weights provided than the alphabet size.
+// There should be exactly as many weights provided than the alphabet size.
 // All weight value should be positive or zero.
 func newEngine(weights []int, eof Symbol) *engine {
 	e := new(engine)
@@ -74,7 +76,7 @@ func newEngine(weights []int, eof Symbol) *engine {
 
 // makeTree computes the huffman tree.
 // No allocation is made, nodes are reused.
-// Leaf weights are unchanged.
+// Leaf weights are updated to e.freq.
 func (e *engine) makeTree() {
 	e.root = nil
 	// reset all parent to zero, weights to initial values ..
