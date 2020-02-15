@@ -28,6 +28,8 @@ func newReader(br BitReader, eof Symbol, weights []int) *hreader {
 }
 
 // ReadSymbol using the provided bit reader.
+// It updates the actual frequency tables for the  symbol,
+// but does not recompute the tree unless told to do so.
 func (hr *hreader) ReadSymbol() (Symbol, error) {
 	if hr.err != nil {
 		return 0, hr.err
@@ -53,5 +55,9 @@ func (hr *hreader) ReadSymbol() (Symbol, error) {
 		hr.err = io.EOF
 		return 0, hr.err
 	}
+
+	// increment actual freq
+	hr.engine.actfreq[n.id]++
+
 	return Symbol(n.id), nil
 }

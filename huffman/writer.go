@@ -32,6 +32,8 @@ func (h *hwriter) Close() error {
 	return h.err
 }
 
+// WriteSymbol writes the symbol, incrementing the actual frequency
+// everytime the symbol is encoded.
 func (h *hwriter) WriteSymbol(s Symbol) error {
 	if h.err != nil {
 		return h.err
@@ -40,9 +42,14 @@ func (h *hwriter) WriteSymbol(s Symbol) error {
 		h.err = errors.New("Symbol is not part of alphabet")
 		return h.err
 	}
+	// increment actual frequency, except for EOF
+	if s != h.eof {
+		h.engine.actfreq[s]++
+	}
 
 	n := &h.nodes[s]
 	h.err = h.writeSymbol(n, nil)
+
 	return h.err
 }
 

@@ -37,6 +37,11 @@ func (n *node) String() string {
 type engine struct {
 	// Symbol alphabet size, number of leaves
 	len int
+	// freq are the frequencies that were used to construct the tree
+	// We need to keep them to reconstruct the initial tree (eg, dump)
+	freq []int
+	// actual frequencies, are updated everytime a symbol is written or read.
+	actfreq []int
 	// eof is an application level eof Symbol, part of the Alphabet
 	eof Symbol
 	// root node
@@ -52,13 +57,15 @@ type engine struct {
 // All weight value should be positive or zero.
 func newEngine(weights []int, eof Symbol) *engine {
 	e := new(engine)
+	e.freq = weights
+	e.actfreq = append([]int(nil), weights...)
 	e.eof = eof
 	e.len = len(weights)
 	e.nodes = make([]node, 2*e.len-1, 2*e.len-1)
 	for i := range e.nodes {
 		e.nodes[i].id = i
 		if i < e.len {
-			e.nodes[i].weight = uint(weights[i])
+			e.nodes[i].weight = uint(e.freq[i])
 		}
 	}
 	e.makeTree()
@@ -70,9 +77,12 @@ func newEngine(weights []int, eof Symbol) *engine {
 // Leaf weights are unchanged.
 func (e *engine) makeTree() {
 	e.root = nil
-	// reset all parent to zero
-	for _, n := range e.nodes {
+	// reset all parent to zero, weights to initial values ..
+	for i, n := range e.nodes {
 		n.parent = nil
+		if i < e.len {
+			n.weight = uint(e.freq[i])
+		}
 	}
 	// loop until all node capacity have been used
 	// alloc points to the next free node.
@@ -129,18 +139,14 @@ func (e *engine) makeTree() {
 
 func (e *engine) Dump() {
 	fmt.Println("Dumping huffman tree ( ", e.len, " symbols, eof is ", e.eof, " )")
-	var freq []int
 
-	for i := 0; i < e.len; i++ {
-		freq = append(freq, int(e.nodes[i].weight))
-	}
 	lw := new(LogWriter)
-	w := NewWriter(lw, 0, freq)
+	w := NewWriter(lw, 0, e.freq)
 
-	for i, f := range freq {
+	for i, f := range e.freq {
 		s := Symbol(i)
 		lw.WriteSymbol(s)
-		fmt.Printf("/weight %d => ", f)
+		fmt.Printf("/weight %d/actualfreq %d => ", f, e.actfreq[i])
 		err := w.WriteSymbol(s)
 		if err != nil {
 			panic("unexpected write error ")
