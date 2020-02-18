@@ -11,6 +11,7 @@ type hwriter struct {
 // NewWriter constructs a hwriter, a SymbolWriteCloser,
 // that can encode symbols into bits.
 // eof is the Symbole that is written when file is closed.
+// It should be part of the initial alphabet (ie eof < len(weights))
 func NewWriter(bw BitWriteCloser, eof Symbol, weights []int) SymbolWriteCloser {
 	return newWriter(bw, eof, weights)
 }

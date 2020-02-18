@@ -1,7 +1,7 @@
 package huffman
 
 // dwriter and dreader are dynamic reader/writer,
-// that will reconstruct thier tree from time to time,
+// that will reconstruct their tree from time to time,
 // to match the actual frequencies.
 
 //============ dwriter ====================
