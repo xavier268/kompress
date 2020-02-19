@@ -50,14 +50,15 @@ type engine struct {
 	// fisrt, leaf nodes, one by Symbol,
 	// then the rest of the nodes, including the root, as the last one.
 	nodes []node
-	// decide if we should update the tree ?
-	scheduler func(e *engine) bool
 }
 
 // newEngine creates a new engine, with the initial weights provided.
 // There should be exactly as many weights provided than the alphabet size.
 // All weight value should be positive or zero.
 func newEngine(weights []int, eof Symbol) *engine {
+	//DEBUG
+	//fmt.Println("Constructing new engine with freq : ", weights)
+
 	e := new(engine)
 	e.freq = weights
 	e.actfreq = append([]int(nil), weights...) // deep copy ...

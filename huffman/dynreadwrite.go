@@ -8,6 +8,8 @@ package huffman
 
 type dwriter struct {
 	*hwriter
+	// decide if we should update the tree ?
+	scheduler func(e *engine) bool
 }
 
 // NewDWriter provides a SymbolWriteCloser that dynamically adapts its decoding tree.
@@ -26,7 +28,8 @@ func newDWriter(bw BitWriteCloser, eof Symbol, weights []int, sch Scheduler) *dw
 func (dw *dwriter) WriteSymbol(s Symbol) error {
 	err := dw.hwriter.WriteSymbol(s)
 	if dw.scheduler != nil && dw.scheduler(dw.engine) {
-		dw.hwriter = newWriter(dw.bwriter, dw.eof, dw.actfreq)
+		//fmt.Println("DEBUG : writer was updated")
+		dw.hwriter = newWriter(dw.bwriter, dw.eof, dw.engine.actfreq)
 	}
 
 	return err
@@ -36,6 +39,8 @@ func (dw *dwriter) WriteSymbol(s Symbol) error {
 
 type dreader struct {
 	*hreader
+	// decide if we should update the tree ?
+	scheduler func(e *engine) bool
 }
 
 // NewDReader provides a SymbolReader that dynamically adapts its decoding tree.
@@ -52,7 +57,8 @@ func newDReader(br BitReader, eof Symbol, weights []int, sch Scheduler) *dreader
 func (dr *dreader) ReadSymbol() (Symbol, error) {
 	s, err := dr.hreader.ReadSymbol()
 	if dr.scheduler != nil && dr.scheduler(dr.engine) {
-		dr.hreader = newReader(dr.breader, dr.eof, dr.actfreq)
+		//fmt.Println("DEBUG : reader was updated")
+		dr.hreader = newReader(dr.breader, dr.eof, dr.engine.actfreq)
 	}
 	return s, err
 }

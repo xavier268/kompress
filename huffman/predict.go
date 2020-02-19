@@ -38,7 +38,7 @@ func (pw *predictwriter) Close() error {
 }
 
 func (pw *predictwriter) WriteSymbol(s Symbol) error {
-	return pw.WriteSymbol(pw.forward(s))
+	return pw.writer.WriteSymbol(pw.forward(s))
 }
 
 type predictreader struct {
