@@ -18,11 +18,9 @@ func TestLZWManualExplore1(t *testing.T) {
 		fmt.Println("Processing=", s)
 		l.WriteSymbol(s)
 		fmt.Println("Nb of nodes : ", len(l.rev))
-		//l.root.dump(nil)
 		l.dump()
 	}
 	l.Close()
-	//l.root.dump(nil)
 	l.dump()
 
 	fmt.Println("From \t", source)
@@ -35,14 +33,31 @@ func TestLZWManualExplore1(t *testing.T) {
 
 	res := []Symbol{}
 	for {
+		r.dump()
 		s1, err = r.ReadSymbol()
-		res = append(res, s1)
 		if err != nil {
 			break
 		}
+		res = append(res, s1)
+		fmt.Println("Read : ", res)
+
 	}
 	fmt.Println("Back :", res)
 	if err != io.EOF {
 		t.Fatal("unexpected error : ", err)
+	}
+
+	if len(source) != len(res) {
+		fmt.Println("Source :", source)
+		fmt.Println("Res    :", res)
+		t.Fatal("Retuned data does not match source data length")
+	}
+
+	for i := range source {
+		if source[i] != res[i] {
+			fmt.Println("Source :", source)
+			fmt.Println("Res    :", res)
+			t.Fatal("source and res do not match")
+		}
 	}
 }

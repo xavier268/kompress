@@ -57,19 +57,6 @@ func (n *lzwNode) sequence() []Symbol {
 
 }
 
-// dump a (sub) node, using the provided symbol subsequence.
-func (n *lzwNode) dump(seq []Symbol) {
-
-	if len(seq) != 0 {
-		fmt.Println(n.value, "\t:\t", seq, "should equal \t", n.sequence())
-	}
-
-	for s, nn := range n.childs {
-		nn.dump(append(seq, Symbol(s)))
-	}
-
-}
-
 // ============  lzw structure itself ====================================
 
 type lzw struct {
@@ -224,7 +211,7 @@ func (lz *lzwreader) ReadSymbol() (s1 Symbol, err error) {
 	var s2 Symbol
 	var n *lzwNode
 
-	// a sequence partially available ...
+	// a sequence partially available in the buffer, use it !
 	if len(lz.seq) > 0 {
 		s1 = lz.seq[0]
 		lz.seq = lz.seq[1:]
@@ -237,30 +224,34 @@ func (lz *lzwreader) ReadSymbol() (s1 Symbol, err error) {
 		return 0, err
 	}
 	n, ok = lz.rev[s2]
-	if !ok {
-		panic("invalid state")
-	}
-	lz.seq = n.sequence()
-	s1 = lz.seq[0]
-	lz.seq = lz.seq[1:]
 
-	// try to extend former leaf node, pointed by current,
-	// with the first new sequence symbol
-	if lz.seqLen <= lz.seqMax && len(lz.rev) < lz.nbOut {
-		if lz.current.childs[s1] == nil { // don't overwrite !
-			nn := new(lzwNode)
+	switch {
+	case ok:
+		// we recognized this symbol 2,
+		// decode the sequence, send its first symbol
+		lz.seq = n.sequence()
+		s1 = lz.seq[0] // to be sent later ...
+		lz.seq = lz.seq[1:]
+
+		// update dictionnary, adding s1 at the end of
+		// the last leaf, pointed to by current
+		if len(lz.rev) < lz.nbOut && lz.seqLen < lz.seqMax {
+			// create a new node
+			nn := newLzwNode()
 			nn.value = Symbol(len(lz.rev))
 			nn.pchild = s1
 			lz.rev[nn.value] = nn
 			lz.current.childs[s1] = nn
 			nn.parent = lz.current
+
+			// point lz.current to the end leaf, update lengths
+			lz.current = nn
+			lz.seqLen = len(nn.sequence())
 		}
+		return s1, nil
+	case !ok:
+		panic("invalid state")
 	}
 
-	// remember what former node was ...
-	lz.seqLen = len(lz.seq)
-	lz.current = n
-
-	return s1, nil
-
+	panic("invalid state")
 }
