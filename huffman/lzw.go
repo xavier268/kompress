@@ -10,7 +10,7 @@ import "fmt"
 // 1. Dictionnary contains sequences <-> key; are multi symbol
 // 2. Find longest dictionnary string that match current input
 // 3. Replace output with key for that sequence
-// 4. Add to dictionnary the sequence formed with the matching sequence
+// 4. ALearn the sequence formed with the matching sequence
 //    followed by the last symbol, until max table size is reached.
 //
 // Encoding changes the encoding alphabet, from Symbol1 to Symbol2
