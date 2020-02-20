@@ -34,8 +34,8 @@ func newlzwdico(nbIn, nbOut, seqMax int) *lzwdico {
 // learn the new sequence, if it can, returning the code symbol out
 func (d *lzwdico) learn(sin []Symbol) {
 	if len(sin) == 0 ||
-		len(sin) >= d.seqMax ||
-		len(d.codes) >= d.nbOut {
+		len(sin) > d.seqMax ||
+		len(d.codes) > d.nbOut {
 		// ignore ...
 		return
 	}
@@ -54,7 +54,7 @@ func (d *lzwdico) learn(sin []Symbol) {
 func (d *lzwdico) learnall(sin []Symbol) {
 
 	for i := 0; i <= len(sin); i++ {
-		for j := i + 1; j < len(sin); j++ {
+		for j := i; j <= len(sin); j++ {
 			//fmt.Println("learning : ", sin[i:j])
 			d.learn(sin[i:j])
 		}
