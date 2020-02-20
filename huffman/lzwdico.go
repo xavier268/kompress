@@ -13,6 +13,9 @@ type lzwdico struct {
 	codes map[string]Symbol
 	// form a symbol out code to a symbol in sequence
 	seqs map[Symbol][]Symbol
+	// buf is a buffer for everything we see
+	// its length may not exceed seqMax
+	buf []Symbol
 }
 
 func newlzwdico(nbIn, nbOut, seqMax int) *lzwdico {
@@ -26,39 +29,35 @@ func newlzwdico(nbIn, nbOut, seqMax int) *lzwdico {
 	d.seqs = make(map[Symbol][]Symbol)
 	// init the dico with codes for in symbols
 	for i := 0; i < nbIn; i++ {
-		d.learn([]Symbol{Symbol(i)})
+		d.buf = []Symbol{}
+		d.learn(Symbol(i))
 	}
 	return d
 }
 
-// learn the new sequence, if it can, returning the code symbol out
-func (d *lzwdico) learn(sin []Symbol) {
-	if len(sin) == 0 ||
-		len(sin) > d.seqMax ||
-		len(d.codes) > d.nbOut {
-		// ignore ...
-		return
-	}
-	// test if already known, don't change it and ignore ...
-	if _, ok := d.codes[fmt.Sprint(sin)]; ok {
-		return
-	}
-	// actual update
-	code := Symbol(len(d.codes))
-	d.codes[fmt.Sprint(sin)] = code
-	d.seqs[code] = sin
-	return
-}
+// learn and add the Symbols to the buffer,
+// udating the dictionnary on the way.
+func (d *lzwdico) learn(ss ...Symbol) {
 
-// lean all the sub sequences
-func (d *lzwdico) learnall(sin []Symbol) {
+	for _, s := range ss {
 
-	for i := 0; i <= len(sin); i++ {
-		for j := i; j <= len(sin); j++ {
-			//fmt.Println("learning : ", sin[i:j])
-			d.learn(sin[i:j])
+		// include in buffer
+		d.buf = append(d.buf, s)
+		if len(d.buf) > d.seqMax {
+			d.buf = d.buf[1:]
 		}
-	}
+
+		// refresh subseq that are not yet known
+		for i := 0; i < len(d.buf); i++ {
+			// don't overwrite existing sequences !
+			if _, ok := d.getCode(d.buf[i:]); !ok {
+				code := Symbol(len(d.codes))
+				d.codes[fmt.Sprint(d.buf[i:])] = code
+				d.seqs[code] = d.buf[i:]
+			}
+		}
+
+	} // for s
 
 }
 
@@ -76,6 +75,7 @@ func (d *lzwdico) getSeq(code Symbol) (sin []Symbol, ok bool) {
 
 func (d *lzwdico) dump() {
 	fmt.Println("There are ", len(d.codes), " codes in the dictionnary")
+	fmt.Println("Internal buffer : ", d.buf)
 	for code, seq := range d.seqs {
 		fmt.Println("Out : ", code, "\t In : ", seq)
 	}
