@@ -13,7 +13,7 @@ func TestDico(t *testing.T) {
 	fmt.Println("Learning all subsequences in ", source)
 	d.learnall(source)
 	d.dump()
-	if len(d.codes) != 24 {
+	if len(d.codes) != 37 {
 		t.Fatal("unexpected dictionnary length")
 	}
 
