@@ -2,6 +2,7 @@ package huffman
 
 import (
 	"fmt"
+	"io"
 	"testing"
 )
 
@@ -26,4 +27,22 @@ func TestLZWManualExplore1(t *testing.T) {
 
 	fmt.Println("From \t", source)
 	fmt.Println("To   \t", bb.buf)
+
+	// read back buffer
+	var err error
+	var s1 Symbol
+	r := newlzwreader(bb, 3, 20, 3)
+
+	res := []Symbol{}
+	for {
+		s1, err = r.ReadSymbol()
+		res = append(res, s1)
+		if err != nil {
+			break
+		}
+	}
+	fmt.Println("Back :", res)
+	if err != io.EOF {
+		t.Fatal("unexpected error : ", err)
+	}
 }

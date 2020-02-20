@@ -165,7 +165,7 @@ func (lz *lzwwriter) WriteSymbol(s Symbol) error {
 	case !ok:
 		// here, the full seq ending with s does not exist
 
-		// save what we had  before adding s, that will be returned
+		// what we had  before adding s is returned
 		err := lz.w.WriteSymbol(lz.current.value)
 		if lz.seqLen <= lz.seqMax && len(lz.rev) < lz.nbOut {
 			// we store the new sequence, adding s
@@ -206,6 +206,8 @@ func (lz *lzwwriter) Close() error {
 type lzwreader struct {
 	*lzw
 	sr SymbolReader
+	// sequence buffer
+	seq []Symbol
 }
 
 func newlzwreader(sr SymbolReader, alphaLenIn int, alphaLenOut int, maxSeq int) *lzwreader {
@@ -218,26 +220,47 @@ func newlzwreader(sr SymbolReader, alphaLenIn int, alphaLenOut int, maxSeq int) 
 // ReadSymbol back from compressed reader.
 func (lz *lzwreader) ReadSymbol() (s1 Symbol, err error) {
 
-	panic("to do !")
-	if lz.current != lz.root {
-		// existing sequence underway
-		s1 = lz.current.pchild
-		lz.current = lz.current.parent
+	var ok bool
+	var s2 Symbol
+	var n *lzwNode
+
+	// a sequence partially available ...
+	if len(lz.seq) > 0 {
+		s1 = lz.seq[0]
+		lz.seq = lz.seq[1:]
 		return s1, nil
 	}
 
-	s2, err := lz.sr.ReadSymbol()
+	// no seq available, get leaf node and sequence
+	s2, err = lz.sr.ReadSymbol()
 	if err != nil {
 		return 0, err
 	}
-
-	n, ok := lz.rev[s2]
-	if ok {
-		// we found the node in the reverse table
-		lz.current = n
-		// we need to update the tree ...
-		// TODO
-		return n.pchild, nil
+	n, ok = lz.rev[s2]
+	if !ok {
+		panic("invalid state")
 	}
-	panic("unexpected symbol")
+	lz.seq = n.sequence()
+	s1 = lz.seq[0]
+	lz.seq = lz.seq[1:]
+
+	// try to extend former leaf node, pointed by current,
+	// with the first new sequence symbol
+	if lz.seqLen <= lz.seqMax && len(lz.rev) < lz.nbOut {
+		if lz.current.childs[s1] == nil { // don't overwrite !
+			nn := new(lzwNode)
+			nn.value = Symbol(len(lz.rev))
+			nn.pchild = s1
+			lz.rev[nn.value] = nn
+			lz.current.childs[s1] = nn
+			nn.parent = lz.current
+		}
+	}
+
+	// remember what former node was ...
+	lz.seqLen = len(lz.seq)
+	lz.current = n
+
+	return s1, nil
+
 }
