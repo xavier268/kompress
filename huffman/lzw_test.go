@@ -5,17 +5,25 @@ import (
 	"testing"
 )
 
-func TestLZWManualExplore(t *testing.T) {
+func TestLZWManualExplore1(t *testing.T) {
 
-	l := newLzw(3, 20, 3)
+	bb := NewSymbolBuffer()
+
+	l := newlzwwriter(bb, 3, 20, 3)
 
 	source := []Symbol{1, 2, 1, 2, 1, 2, 1, 2}
+
 	for _, s := range source {
-
 		fmt.Println("Processing=", s)
-		l.forward(s, func(s2 Symbol) { fmt.Println("Emitting : ", s2) })
+		l.WriteSymbol(s)
 		fmt.Println("Nb of nodes : ", len(l.rev))
-		l.root.dump(nil)
-
+		//l.root.dump(nil)
+		l.dump()
 	}
+	l.Close()
+	//l.root.dump(nil)
+	l.dump()
+
+	fmt.Println("From \t", source)
+	fmt.Println("To   \t", bb.buf)
 }

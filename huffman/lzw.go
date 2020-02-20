@@ -26,7 +26,10 @@ type lzwNode struct {
 	childs map[Symbol]*lzwNode
 	// encoding Symbol "out" of the sequence at this point
 	// only valid if a leaf node (ie, no child)
-	value Symbol
+	value  Symbol
+	parent *lzwNode
+	// what symbol "in" lead us her ?
+	pchild Symbol
 }
 
 func newLzwNode() *lzwNode {
@@ -40,16 +43,31 @@ func (n *lzwNode) isLeaf() bool {
 	return len(n.childs) == 0
 }
 
+// sequence from any node, upwards until root
+func (n *lzwNode) sequence() []Symbol {
+	var sq []Symbol
+
+	for nn := n; nn != nil; nn = nn.parent {
+		if nn.parent != nil {
+			sq = append([]Symbol{nn.pchild}, sq...)
+		}
+	}
+
+	return sq
+
+}
+
 // dump a (sub) node, using the provided symbol subsequence.
 func (n *lzwNode) dump(seq []Symbol) {
 
 	if len(seq) != 0 {
-		fmt.Println(n.value, "\t:\t", seq)
+		fmt.Println(n.value, "\t:\t", seq, "should equal \t", n.sequence())
 	}
 
 	for s, nn := range n.childs {
 		nn.dump(append(seq, Symbol(s)))
 	}
+
 }
 
 // ============  lzw structure itself ====================================
@@ -89,14 +107,45 @@ func newLzw(alphaLenIn int, alphaLenOut int, maxSeq int) *lzw {
 	for s := 0; s < l.nbIn; s++ {
 		n := newLzwNode()
 		n.value = Symbol(s)
+		n.parent = l.root
+		n.pchild = Symbol(s)
 		l.root.childs[Symbol(s)] = n
 		l.rev[Symbol(s)] = n
 	}
 	return l
 }
 
-// forward incoming symbol s, emitting symbol as needed.
-func (lz *lzw) forward(s Symbol, emit func(Symbol)) {
+func (lz *lzw) dump() {
+	fmt.Println("Number of nodes : ", len(lz.rev))
+	for s, n := range lz.rev {
+		fmt.Println(s, "\t==>\t", n.sequence())
+	}
+}
+
+//============ lzwwriter =================================
+
+type lzwwriter struct {
+	*lzw
+	w SymbolWriteCloser
+}
+
+// NewLZWWriter constructor.
+func NewLZWWriter(sw SymbolWriteCloser,
+	alphaLenIn int, alphaLenOut int, maxSeq int) SymbolWriteCloser {
+	return newlzwwriter(sw, alphaLenIn, alphaLenOut, maxSeq)
+}
+
+func newlzwwriter(sw SymbolWriteCloser,
+	alphaLenIn int, alphaLenOut int, maxSeq int) *lzwwriter {
+
+	l := new(lzwwriter)
+	l.lzw = newLzw(alphaLenIn, alphaLenOut, maxSeq)
+	l.w = sw
+	return l
+}
+
+// WriteSymbol incoming symbol s, emitting symbol as needed.
+func (lz *lzwwriter) WriteSymbol(s Symbol) error {
 
 	// update sequence length
 	lz.seqLen++
@@ -106,33 +155,89 @@ func (lz *lzw) forward(s Symbol, emit func(Symbol)) {
 	case ok && lz.seqLen <= lz.seqMax:
 		// we can accepts more syms in sequence
 		lz.current = n
-		return
+		return nil
 	case ok && lz.seqLen > lz.seqMax:
 		// have to stop here, say we found it !
 		lz.current = lz.root
 		lz.seqLen = 0
-		emit(n.value)
-		return
+		return lz.w.WriteSymbol(n.value)
+
 	case !ok:
 		// here, the full seq ending with s does not exist
 
 		// save what we had  before adding s, that will be returned
-		emit(lz.current.value)
+		err := lz.w.WriteSymbol(lz.current.value)
 		if lz.seqLen <= lz.seqMax && len(lz.rev) < lz.nbOut {
 			// we store the new sequence, adding s
 			// provided length is still ok
 			nn := newLzwNode()
 			nn.value = Symbol(len(lz.rev))
+			nn.pchild = s
 			lz.rev[nn.value] = nn
 			lz.current.childs[s] = nn
+			nn.parent = lz.current
 		}
 		// update pointers and sequence length
 		lz.current = lz.root.childs[s]
 		lz.seqLen = 1
-		return
+		return err
 	default:
 		panic("invalid state")
 
 	}
 
+}
+
+// Close and flush pending sequence.
+func (lz *lzwwriter) Close() error {
+	if lz.seqLen != 0 {
+		err := lz.w.WriteSymbol(lz.current.value)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return lz.w.Close()
+}
+
+//============ lzwreader =================================
+
+type lzwreader struct {
+	*lzw
+	sr SymbolReader
+}
+
+func newlzwreader(sr SymbolReader, alphaLenIn int, alphaLenOut int, maxSeq int) *lzwreader {
+	r := new(lzwreader)
+	r.lzw = newLzw(alphaLenIn, alphaLenOut, maxSeq)
+	r.sr = sr
+	return r
+}
+
+// ReadSymbol back from compressed reader.
+func (lz *lzwreader) ReadSymbol() (s1 Symbol, err error) {
+
+	panic("to do !")
+	if lz.current != lz.root {
+		// existing sequence underway
+		s1 = lz.current.pchild
+		lz.current = lz.current.parent
+		return s1, nil
+	}
+
+	s2, err := lz.sr.ReadSymbol()
+	if err != nil {
+		return 0, err
+	}
+
+	n, ok := lz.rev[s2]
+	if ok {
+		// we found the node in the reverse table
+		lz.current = n
+		// we need to update the tree ...
+		// TODO
+		return n.pchild, nil
+	}
+	panic("unexpected symbol")
 }
