@@ -12,7 +12,7 @@ type kfreq struct {
 }
 
 // update the frequency table with the byte provided
-// Will also uupdate the esc value, as needed.
+// Will also update the esc value, as needed.
 func (f *kfreq) update(b byte) {
 	f.sum++
 	f.freq[b]++

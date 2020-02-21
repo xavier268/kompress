@@ -23,18 +23,23 @@ func NewMyZipWriter(iow io.Writer) io.WriteCloser {
 	var b2bw BitWriteCloser = NewBitToByteWriter(iow)
 
 	// transform symbols to bits
-	eof := Symbol(257)
-	weights := [258]int{}
-	sch := SCAlways
+	eof := Symbol(256 * 100)
+	weights := [256*100 + 1]int{}
+	sch := SCDelta
+
+	// alphabet in is 256*100 , out 256*100+1 (set by weights length)
 	var wrt SymbolWriteCloser = NewDWriter(b2bw, eof, weights[:], sch)
 
 	// Add multi byte predictive layers
-	//var p2 SymbolWriteCloser = NewPredictWriter(wrt, 257, 2)
-	var p3 SymbolWriteCloser = NewPredictWriter(wrt, 257, 3)
-	//var p4 SymbolWriteCloser = NewPredictWriter(wrt, 257, 4)
+	// var p2 SymbolWriteCloser = NewPredictWriter(wrt, 257, 2)
+	// var p3 SymbolWriteCloser = NewPredictWriter(wrt, 257, 3)
+	// var p4 SymbolWriteCloser = NewPredictWriter(wrt, 257, 4)
+
+	// add lzw layer, albaet in is 257, out is 256*100
+	var z SymbolWriteCloser = NewLZWWriter(wrt, 257, 256*100, 4)
 
 	// add repeat layer - alphabet was 256 , becomes 257
-	var rpt SymbolWriteCloser = NewRepeatWriter(p3, 256)
+	var rpt SymbolWriteCloser = NewRepeatWriter(z, 256)
 
 	return &myZipWriter{rpt}
 
@@ -45,16 +50,18 @@ func NewMyZipReader(ior io.Reader) io.Reader {
 
 	var br BitReader = NewBitFromByteReader(ior)
 
-	eof := Symbol(257)
-	weights := [258]int{}
-	sch := SCAlways
+	eof := Symbol(256 * 100)
+	weights := [256*100 + 1]int{}
+	sch := SCDelta
 	var dr SymbolReader = NewDReader(br, eof, weights[:], sch)
 
 	//var p2 SymbolReader = NewPredictReader(dr, 257, 2)
-	var p3 SymbolReader = NewPredictReader(dr, 257, 3)
+	// var p3 SymbolReader = NewPredictReader(dr, 257, 3)
 	//var p4 SymbolReader = NewPredictReader(dr, 257, 4)
 
-	var rpt SymbolReader = NewRepeatReader(p3, 256)
+	var z SymbolReader = NewLZWReader(dr, 257, 256*100, 4)
+
+	var rpt SymbolReader = NewRepeatReader(z, 256)
 
 	return &myZipReader{rpt}
 

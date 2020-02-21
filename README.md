@@ -1,39 +1,53 @@
 # kompress
 
-Compression engines (complementing / improving go-gzip package)
+This is a self-learning attempt at implementing various lossless compression algorithms, that can be combined into a GZip compatible compressor/decompressor.
 
-The API is similar to the gzip golang package : you first construct a writer (resp. a reader) and then write (resp. read) through it to compress (resp. decompress) your data.
+The constraint was to read the stream of bytes/symobls only once.
+
+The API is similar to the gzip golang package : you first construct a writer (resp. a reader) and then write (resp. read) through it to compress (resp. decompress) your data. Writers/Readers can (should) be chained.
+
 It is essential to Close the Writer when finished, to ensure data is flushed.
 
-For perfomance, you may want to buffer io.Writer and io.Reader. This is not taken care of by the engines.
+For performance, you may want to buffer the initial io.Writer and io.Reader. This is not taken care of by the engines.
 
 You may use these engines to preprocess data before it is gziped, or to replace gzip completely.
 
-At the moment, the following engines are provided :
+At the moment, the following building blocks are :
 
-## Klog
+## MyZip
 
-Not actually a compression. 
+A typical assembly of a byte-to-symbol block, then a reapeat block, then a lzw block, then a huffamn block, then a bit2byte blok. It compresses bytes into bytes.
 
-Does not change the bytes. Just dump on screen the bytes as they flow through.
+## DynReader and Writer
 
-## Krlen
+The DReader/Writer provides an adaptative huffman compression, compressing symbols into bits (after adding and EOF Symbol to the alphabet). A scheduler defines how frequently the huffman frequency tree is recomputed.
 
-Local compression. 
+It relies on an *engine* that does the huffan tree management, and hwriter/reader, that implements a fixed tree huffman encoding.
 
-It replaces sequences of identical bytes with specially encoded shorter sequences, using an escape byte. The escape byte is dynamically selected 
-from the least frequent bytes.
+## LZW
 
-## Kdelta
+This layer will use a dictionnary-based compression, based on the idea from the LZW algorith, to compress from an alphabet to a larger alphabet, buiding a dictionnary of known sequence on the way.
 
-Global transformation. 
+## KDelta 
 
-Not really a compression, it tries to predict the next bytes, based on the history,
-and will encode the delta. This is a way to detect possibly long sequences far away in the file, and encode them in a way that will require only local optimization (Krlen and/or Kbit) as a next step.
+This layer will not change the alphabet. It tries to predict the next Symbol, based on what it has seen so far, encoding the delta between the prediction and the truth. It does not actually "compress" the message, but improves the statistical properties for a better huffman compression stage if there are some distant redunduncies in the message.
 
-## Kbit (TO DO)
+## Repeat
 
-Local compression.
+This layer will compress the sequenece of identical Symbols, using and additionnal "escaped" Symbol. Therefore, the resulting alphabet is one Symbol larger.
 
-It encodes the bytes using a adaptative huffman coding variable bit encoding.
+## Utilities
 
+**BitBuffer** : A FIFO buffer than can read/write bits, or bytes (seen as 8 bits). Closing triggers a flush, padding with 0 bits. An EOF Symbol must be used to recognized the actual end of file.
+
+**BitFromByteReader/BitToByteWriter** : a conversion layer between bits and bytes.
+
+**LogWriter** : Writes to / reads from  the console, for debugging.
+
+## Note on performance: 
+
+As expected, performance is far from matching the build-in Golang GZip, as can be observed in the provided tests and benchmarks. 
+
+However, some of these blocks maybe used as preprocessing layers, before the built-in GZip is applied, or when processing streams of Symbols that are not bytes, but significantly wider or narrower.
+
+And anyway, it was fun to write and debug !

@@ -32,6 +32,14 @@ func TestMyZipBasic(t *testing.T) {
 	testReadWriteMyZip(t, source)
 
 }
+
+func BenchmarkMyZip(b *testing.B) {
+	source := []byte("Hello world !")
+	for n := 0; n < b.N; n++ {
+		testReadWriteMyZip(nil, source)
+	}
+}
+
 func testReadWriteMyZip(t *testing.T, source []byte) {
 
 	bb := bytes.NewBuffer(nil)
