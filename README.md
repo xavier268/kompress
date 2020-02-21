@@ -1,6 +1,8 @@
+[![Documentation](https://godoc.org/github.com/xavier268/kompress?status.svg)](http://godoc.org/github.com/xavier268/kompress)
+
 # kompress
 
-This is a self-learning & proof-og-concept implementation of various lossless compression algorithms, that can be combined into a GZip compatible compressor/decompressor.
+This is a self-learning, proof-of-concept, no-dependency implementation of various lossless compression algorithms, that can be combined into a GZip compatible compressor/decompressor.
 
 By design, it reads the stream of bytes/symbols only once, to comply with the GZip interface.
 
@@ -38,13 +40,15 @@ This layer will compress the sequences of identical successive Symbols, using an
 
 ## Utilities
 
-**BitBuffer** : A FIFO buffer than can read/write bits, or bytes (seen as 8 bits). Closing triggers a flush, padding with 0 bits. An EOF Symbol must be used to recognized the actual end of file.
+**BitBuffer** : A FIFO buffer than can read/write bits, or bytes (seen as 8 bits). Closing triggers a flush, padding with 0 bits. An EOF Symbol must be used to recognize the actual end of file.
 
 **BitFromByteReader/BitToByteWriter** : a conversion layer between bits and bytes.
 
 **LogWriter** : Writes to / reads from  the console, for debugging.
 
 ## Note on performance: 
+
+This is **NOT A PRODUTION GRADE** package.
 
 As expected, performance is far from matching the build-in Golang GZip, as can be observed in the provided tests and benchmarks. 
 
