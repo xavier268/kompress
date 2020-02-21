@@ -1,10 +1,10 @@
-package huffman
+package kompress
 
 // Test texts
 
 const text1 = "Ceci est un texte en français"
 const text2 = `
-	La nuit était fort noire et la forêt très-sombre.
+La nuit était fort noire et la forêt très-sombre.
 Hermann à mes côtés me paraissait une ombre.
 Nos chevaux galopaient. A la garde de Dieu !
 Les nuages du ciel ressemblaient à des marbres.

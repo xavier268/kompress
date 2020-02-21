@@ -1,4 +1,4 @@
-package huffman
+package kompress
 
 // dwriter and dreader are dynamic reader/writer,
 // that will reconstruct their tree from time to time,

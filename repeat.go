@@ -1,4 +1,4 @@
-package huffman
+package kompress
 
 // repeat writer/reader is a preprocessing layer
 // that will replace sequence of identical streams

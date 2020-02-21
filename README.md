@@ -1,12 +1,12 @@
 # kompress
 
-This is a self-learning attempt at implementing various lossless compression algorithms, that can be combined into a GZip compatible compressor/decompressor.
+This is a self-learning & proof-og-concept implementation of various lossless compression algorithms, that can be combined into a GZip compatible compressor/decompressor.
 
-The constraint was to read the stream of bytes/symobls only once.
+By design, it reads the stream of bytes/symbols only once, to comply with the GZip interface.
 
 The API is similar to the gzip golang package : you first construct a writer (resp. a reader) and then write (resp. read) through it to compress (resp. decompress) your data. Writers/Readers can (should) be chained.
 
-It is essential to Close the Writer when finished, to ensure data is flushed.
+It is **essential to close** the Writer when finished, to ensure data is flushed.
 
 For performance, you may want to buffer the initial io.Writer and io.Reader. This is not taken care of by the engines.
 
@@ -16,17 +16,17 @@ At the moment, the following building blocks are :
 
 ## MyZip
 
-A typical assembly of a byte-to-symbol block, then a reapeat block, then a lzw block, then a huffamn block, then a bit2byte blok. It compresses bytes into bytes.
+A typical assembly of a byte-to-symbol block, then a reapeat block, then a lzw block, then a huffann block, then a bit2byte blok. It compresses bytes into bytes.
 
 ## DynReader and Writer
 
-The DReader/Writer provides an adaptative huffman compression, compressing symbols into bits (after adding and EOF Symbol to the alphabet). A scheduler defines how frequently the huffman frequency tree is recomputed.
+The DReader/Writer provides an adaptative huffman compression, compressing symbols into bits (after adding and EOF Symbol to the symbol alphabet). A scheduler defines how frequently the huffman frequency tree is recomputed.
 
 It relies on an *engine* that does the huffan tree management, and hwriter/reader, that implements a fixed tree huffman encoding.
 
 ## LZW
 
-This layer will use a dictionnary-based compression, based on the idea from the LZW algorith, to compress from an alphabet to a larger alphabet, buiding a dictionnary of known sequence on the way.
+This layer will use a dictionnary-based compression, based on the idea of the LZW algorith, to compress from an alphabet to a larger alphabet, buiding a dictionnary of known sequence on the way.
 
 ## KDelta 
 
@@ -34,7 +34,7 @@ This layer will not change the alphabet. It tries to predict the next Symbol, ba
 
 ## Repeat
 
-This layer will compress the sequenece of identical Symbols, using and additionnal "escaped" Symbol. Therefore, the resulting alphabet is one Symbol larger.
+This layer will compress the sequences of identical successive Symbols, using and additionnal "escaped" Symbol. Therefore, the resulting alphabet is one Symbol larger.
 
 ## Utilities
 
