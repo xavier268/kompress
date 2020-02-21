@@ -17,103 +17,13 @@ import "fmt"
 // Symbol1 is the original Symbol,
 // Symbol2 has up to dicomax values,
 
-// maxLen is the max length of the sequence to be encoded.
-const maxLen = 20
-
-// ============ structure for the sequence distionnary is a tree ========
-
-type lzwNode struct {
-	childs map[Symbol]*lzwNode
-	// encoding Symbol "out" of the sequence at this point
-	// only valid if a leaf node (ie, no child)
-	value  Symbol
-	parent *lzwNode
-	// what symbol "in" lead us her ?
-	pchild Symbol
-}
-
-func newLzwNode() *lzwNode {
-	n := new(lzwNode)
-	n.childs = make(map[Symbol]*lzwNode, 0)
-	return n
-}
-
-// is the node a leaf ?
-func (n *lzwNode) isLeaf() bool {
-	return len(n.childs) == 0
-}
-
-// sequence from any node, upwards until root
-func (n *lzwNode) sequence() []Symbol {
-	var sq []Symbol
-
-	for nn := n; nn != nil; nn = nn.parent {
-		if nn.parent != nil {
-			sq = append([]Symbol{nn.pchild}, sq...)
-		}
-	}
-
-	return sq
-
-}
-
-// ============  lzw structure itself ====================================
-
-type lzw struct {
-	// root of the dictionnary tree for sequences.
-	// It maps sequences to a new "out" Symbol.
-	root *lzwNode
-	// reverse maping, from Symbol "Out" to the node containing that value
-	rev map[Symbol]*lzwNode
-	// points to the current sub tree, given sequence seen so far.
-	current *lzwNode
-	// current seq length so far
-	seqLen int
-	// max sequence length
-	seqMax int
-	// alphabet length in and out
-	nbIn, nbOut int
-}
-
-// newLZW constructs a LZW engine,
-// from one alphabet size to another.
-func newLzw(alphaLenIn int, alphaLenOut int, maxSeq int) *lzw {
-	if alphaLenOut <= alphaLenIn {
-		panic(fmt.Sprint("incompatible input parameters :",
-			alphaLenIn, alphaLenOut, maxSeq))
-	}
-	l := new(lzw)
-	l.nbIn = alphaLenIn
-	l.nbOut = alphaLenOut
-	l.seqMax = maxSeq
-	l.root = newLzwNode()
-	l.current = l.root
-	l.rev = make(map[Symbol]*lzwNode)
-
-	// init the tree, creating child nodes for each Symbol "in"
-	for s := 0; s < l.nbIn; s++ {
-		n := newLzwNode()
-		n.value = Symbol(s)
-		n.parent = l.root
-		n.pchild = Symbol(s)
-		l.root.childs[Symbol(s)] = n
-		l.rev[Symbol(s)] = n
-	}
-	return l
-}
-
-func (lz *lzw) dump() {
-	fmt.Println("Number of nodes : ", len(lz.rev))
-	for s, n := range lz.rev {
-		fmt.Println(s, "\t==>\t", n.sequence())
-	}
-}
-
 //============ lzwwriter =================================
 
 type lzwwriter struct {
-	*lzw
-	w SymbolWriteCloser
+	*lzwdico
+	// sequence prepared for writing ...
+	seq []Symbol
+	w   SymbolWriteCloser
 }
 
 // NewLZWWriter constructor.
@@ -126,7 +36,7 @@ func newlzwwriter(sw SymbolWriteCloser,
 	alphaLenIn int, alphaLenOut int, maxSeq int) *lzwwriter {
 
 	l := new(lzwwriter)
-	l.lzw = newLzw(alphaLenIn, alphaLenOut, maxSeq)
+	l.lzwdico = newlzwdico(alphaLenIn, alphaLenOut, maxSeq)
 	l.w = sw
 	return l
 }
@@ -134,124 +44,135 @@ func newlzwwriter(sw SymbolWriteCloser,
 // WriteSymbol incoming symbol s, emitting symbol as needed.
 func (lz *lzwwriter) WriteSymbol(s Symbol) error {
 
-	// update sequence length
-	lz.seqLen++
-
-	n, ok := lz.current.childs[s]
-	switch {
-	case ok && lz.seqLen <= lz.seqMax:
-		// we can accepts more syms in sequence
-		lz.current = n
-		return nil
-	case ok && lz.seqLen > lz.seqMax:
-		// have to stop here, say we found it !
-		lz.current = lz.root
-		lz.seqLen = 0
-		return lz.w.WriteSymbol(n.value)
-
-	case !ok:
-		// here, the full seq ending with s does not exist
-
-		// what we had  before adding s is returned
-		err := lz.w.WriteSymbol(lz.current.value)
-		if lz.seqLen <= lz.seqMax && len(lz.rev) < lz.nbOut {
-			// we store the new sequence, adding s
-			// provided length is still ok
-			nn := newLzwNode()
-			nn.value = Symbol(len(lz.rev))
-			nn.pchild = s
-			lz.rev[nn.value] = nn
-			lz.current.childs[s] = nn
-			nn.parent = lz.current
-		}
-		// update pointers and sequence length
-		lz.current = lz.root.childs[s]
-		lz.seqLen = 1
-		return err
-	default:
-		panic("invalid state")
-
+	if int(s) > lz.nbIn {
+		fmt.Println("input  token :", s)
+		panic("invalid input  token (too large)")
 	}
 
-}
+	lz.seq = append(lz.seq, s)
 
-// Close and flush pending sequence.
-func (lz *lzwwriter) Close() error {
-	if lz.seqLen != 0 {
-		err := lz.w.WriteSymbol(lz.current.value)
+	// check if full seq is known ...
+	code, ok := lz.getCode(lz.seq)
+	switch {
+	case ok && len(lz.seq) < lz.seqMax:
+		// seq is known, but not yet max, try to get more ...
+		return nil
+	case ok && len(lz.seq) >= lz.seqMax:
+		// seq is known, maximum reached, do not try further
+		err := lz.w.WriteSymbol(code)
 		if err != nil {
 			return err
 		}
+		// learn, then clear what was learnt
+		lz.learn(lz.seq...)
+		lz.seq = []Symbol{}
+		return nil
 
+	case !ok && len(lz.seq) > 0:
+
+		// here, previous sequence cannot be decoded ..
+		// let's decode the first sub sequence that would work.
+		// this can happen if the table is full.
+
+		// adjust flush the same way.
+
+		// start with the beginning of sequence, until we cannot decode,
+		// then emit, and start again ...
+
+		// find the longuest subsequence
+		i := 1
+		for _, ok = lz.getCode(lz.seq[:i]); ok && i < len(lz.seq); i++ {
+		}
+		i-- // i is now the longuest valid sub sequence
+		code, ok := lz.getCode(lz.seq[:i])
+		if !ok {
+			lz.dump()
+			fmt.Println("i=", i, "full seq : ", lz.seq, "subseq =", lz.seq[:i], ", s = ", s)
+			panic("invalid state")
+		}
+		err := lz.w.WriteSymbol(code)
+		if err != nil {
+			return err
+		}
+		// learn and clear what was learnt
+		lz.learn(lz.seq[:i]...)
+		lz.seq = lz.seq[i:]
+		return nil
 	}
+	panic("invalid state")
+}
 
+// Close (and flush ...)
+func (lz *lzwwriter) Close() error {
+	if len(lz.seq) != 0 {
+		code, ok := lz.getCode(lz.seq)
+		if ok {
+			err := lz.w.WriteSymbol(code)
+			if err != nil {
+				return err
+			}
+		} else {
+			fmt.Println("Flushing sequence ", lz.seq)
+			lz.dump()
+			panic("invalid state")
+		}
+	}
 	return lz.w.Close()
 }
 
 //============ lzwreader =================================
 
 type lzwreader struct {
-	*lzw
-	sr SymbolReader
-	// sequence buffer
-	seq []Symbol
+	*lzwdico
+	// available symbols to be read
+	avail []Symbol
+	r     SymbolReader
 }
 
-func newlzwreader(sr SymbolReader, alphaLenIn int, alphaLenOut int, maxSeq int) *lzwreader {
-	r := new(lzwreader)
-	r.lzw = newLzw(alphaLenIn, alphaLenOut, maxSeq)
-	r.sr = sr
-	return r
+// NewLZWReader constructor.
+func NewLZWReader(sr SymbolReader,
+	alphaLenIn int, alphaLenOut int, maxSeq int) SymbolReader {
+	return newlzwreader(sr, alphaLenIn, alphaLenOut, maxSeq)
 }
 
-// ReadSymbol back from compressed reader.
-func (lz *lzwreader) ReadSymbol() (s1 Symbol, err error) {
+func newlzwreader(sr SymbolReader,
+	alphaLenIn int, alphaLenOut int, maxSeq int) *lzwreader {
 
-	var ok bool
-	var s2 Symbol
-	var n *lzwNode
+	l := new(lzwreader)
+	l.lzwdico = newlzwdico(alphaLenIn, alphaLenOut, maxSeq)
+	l.r = sr
+	return l
+}
 
-	// a sequence partially available in the buffer, use it !
-	if len(lz.seq) > 0 {
-		s1 = lz.seq[0]
-		lz.seq = lz.seq[1:]
-		return s1, nil
-	}
+func (lr *lzwreader) ReadSymbol() (Symbol, error) {
 
-	// no seq available, get leaf node and sequence
-	s2, err = lz.sr.ReadSymbol()
-	if err != nil {
-		return 0, err
-	}
-	n, ok = lz.rev[s2]
+	if len(lr.avail) == 0 {
+		lr.avail = []Symbol{} // memory control ...
 
-	switch {
-	case ok:
-		// we recognized this symbol 2,
-		// decode the sequence, send its first symbol
-		lz.seq = n.sequence()
-		s1 = lz.seq[0] // to be sent later ...
-		lz.seq = lz.seq[1:]
-
-		// update dictionnary, adding s1 at the end of
-		// the last leaf, pointed to by current
-		if len(lz.rev) < lz.nbOut && lz.seqLen < lz.seqMax {
-			// create a new node
-			nn := newLzwNode()
-			nn.value = Symbol(len(lz.rev))
-			nn.pchild = s1
-			lz.rev[nn.value] = nn
-			lz.current.childs[s1] = nn
-			nn.parent = lz.current
-
-			// point lz.current to the end leaf, update lengths
-			lz.current = nn
-			lz.seqLen = len(nn.sequence())
+		// here, nothing is ready to be read,
+		// lets read more in the buffers
+		s2, err := lr.r.ReadSymbol()
+		if err != nil {
+			return 0, err
 		}
-		return s1, nil
-	case !ok:
-		panic("invalid state")
+		sin, ok := lr.getSeq(s2)
+		if !ok || len(sin) == 0 {
+			lr.lzwdico.dump()
+			fmt.Println("Could not find symbol out : ", s2)
+			panic("out symbol unknown in dictionnary - invalid state")
+		}
+		// learn and update available symbols
+		lr.learn(sin...)
+		lr.avail = sin
+
+	} // if len avail == 0
+
+	if len(lr.avail) == 0 {
+		panic("avail should not be empty - invalid state")
 	}
 
-	panic("invalid state")
+	s := lr.avail[0]
+	lr.avail = lr.avail[1:]
+
+	return s, nil
 }

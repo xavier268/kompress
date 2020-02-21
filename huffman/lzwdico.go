@@ -29,8 +29,8 @@ func newlzwdico(nbIn, nbOut, seqMax int) *lzwdico {
 	d.seqs = make(map[Symbol][]Symbol)
 	// init the dico with codes for in symbols
 	for i := 0; i < nbIn; i++ {
-		d.buf = []Symbol{}
 		d.learn(Symbol(i))
+		d.buf = []Symbol{}
 	}
 	return d
 }
@@ -38,6 +38,11 @@ func newlzwdico(nbIn, nbOut, seqMax int) *lzwdico {
 // learn and add the Symbols to the buffer,
 // udating the dictionnary on the way.
 func (d *lzwdico) learn(ss ...Symbol) {
+
+	// Do not update if all out symbols are used.
+	if len(d.codes) >= d.nbOut {
+		return
+	}
 
 	for _, s := range ss {
 
@@ -50,7 +55,7 @@ func (d *lzwdico) learn(ss ...Symbol) {
 		// refresh subseq that are not yet known
 		for i := 0; i < len(d.buf); i++ {
 			// don't overwrite existing sequences !
-			if _, ok := d.getCode(d.buf[i:]); !ok {
+			if _, ok := d.getCode(d.buf[i:]); !ok && len(d.codes) < d.nbOut {
 				code := Symbol(len(d.codes))
 				d.codes[fmt.Sprint(d.buf[i:])] = code
 				d.seqs[code] = d.buf[i:]
